@@ -2,6 +2,7 @@ import { useRef, useState, type FormEvent } from "react"
 import type { Store } from "../types"
 import { exportJson, importJson, type ImportMode, type ImportResult } from "../lib/storage"
 import { GRID_SIZES, type GridSize } from "../lib/settings"
+import { appVersion } from "../lib/updates"
 import tmdbLogo from "../assets/tmdb-logo.svg"
 import ViewHeader from "./ViewHeader"
 import { IconCheck, IconChevronRight, IconDownload, IconUpload } from "./Icons"
@@ -153,6 +154,7 @@ export default function MoreView({ store, onImported, gridSize, onGridSizeChange
         <div className="group-row">
           <p className="about-app"><span className="logo">filmio</span> – deine persönliche Filmliste.</p>
           <p className="hint">Alle Daten bleiben lokal auf deinem Gerät. Kein Konto, kein Server.</p>
+          <p className="hint app-version">Version {appVersion()}</p>
         </div>
         <div className="group-row attribution">
           <img src={tmdbLogo} alt="TMDB – The Movie Database" className="tmdb-logo" width={32} height={32} />

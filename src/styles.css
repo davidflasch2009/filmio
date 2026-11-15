@@ -433,6 +433,7 @@ div.card-main { cursor: default; }
 .segment-active .segment-label { color: var(--accent); }
 
 .about-app { margin-bottom: 4px; font-size: 16px; }
+.app-version { margin-top: 6px; font-size: 12px; font-variant-numeric: tabular-nums; }
 .logo { font-weight: 800; letter-spacing: -0.02em; color: var(--accent); }
 .attribution { display: flex; align-items: center; gap: 12px; }
 .attribution p { color: var(--muted); font-size: 12.5px; line-height: 1.4; }
