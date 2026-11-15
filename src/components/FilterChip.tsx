@@ -27,6 +27,8 @@ export default function FilterChip<T extends string | number>({ id, label, optio
         onChange={(e) => {
           const hit = options.find((o) => String(o.value) === e.target.value)
           if (hit) onChange(hit.value)
+          // iOS lässt das Auswahlfeld sonst fokussiert (und damit markiert) stehen.
+          e.currentTarget.blur()
         }}
       >
         {options.map((o) => <option key={String(o.value)} value={String(o.value)}>{o.label}</option>)}

@@ -104,7 +104,7 @@ img { display: block; max-width: 100%; }
 .chip .ic { width: 15px; height: 15px; }
 .chip select { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; font-size: 16px; cursor: pointer; }
 .chip-active { background: var(--accent-soft); color: var(--accent); }
-.chip:has(select:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+
 
 .filter-info { margin: -6px 0 14px; color: var(--muted); font-size: 14px; }
 .empty { display: grid; justify-items: center; gap: 14px; color: var(--muted); text-align: center; padding: 40px 8px; }
@@ -367,7 +367,7 @@ div.card-main { cursor: default; }
 .radio-row input { position: absolute; opacity: 0; pointer-events: none; }
 .radio-check { width: 20px; height: 20px; color: var(--accent); visibility: hidden; }
 .radio-row:has(input:checked) .radio-check { visibility: visible; }
-.radio-row:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: -2px; }
+
 .import-form .group-row:last-child { padding-block: 12px; }
 .import-form + .notice { margin-top: 12px; }
 
@@ -376,7 +376,7 @@ div.card-main { cursor: default; }
 .segments { clear: both; display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; padding: 3px; border-radius: 10px; background: var(--bg); }
 .segment { position: relative; display: flex; flex-direction: column; align-items: center; gap: 1px; padding: 7px 4px; border-radius: 8px; cursor: pointer; }
 .segment input { position: absolute; opacity: 0; pointer-events: none; }
-.segment:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 1px; }
+
 .segment-label { font-size: 15px; font-weight: 600; }
 .segment-hint { font-size: 11.5px; color: var(--muted); }
 .segment-active { background: var(--surface-3); }
@@ -387,6 +387,16 @@ div.card-main { cursor: default; }
 .attribution { display: flex; align-items: center; gap: 12px; }
 .attribution p { color: var(--muted); font-size: 12.5px; line-height: 1.4; }
 .tmdb-logo { width: 32px; height: 32px; flex: none; }
+
+/* Fokus-Ringe für versteckte Auswahlfelder nur mit Maus/Tastatur – bei Touch bleibt nichts markiert. */
+@media (hover: hover) and (pointer: fine) {
+  .chip:has(select:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .radio-row:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: -2px; }
+  .segment:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 1px; }
+}
+@media (hover: none) {
+  .chip select:focus, .segment input:focus, .radio-row input:focus { outline: none; }
+}
 
 /* ---------- Toast ---------- */
 
