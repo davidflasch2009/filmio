@@ -36,6 +36,10 @@
 *, *::before, *::after { box-sizing: border-box; }
 [hidden] { display: none !important; }
 
+/* Keine sichtbaren Scrollbalken – weder auf der Seite noch in Detailseite, Fragebogen oder Chip-Leiste. */
+html, body, * { scrollbar-width: none; -ms-overflow-style: none; }
+::-webkit-scrollbar { display: none; width: 0; height: 0; background: transparent; }
+
 html, body { margin: 0; background: var(--bg); color: var(--fg); }
 body { min-height: 100vh; min-height: 100dvh; overscroll-behavior-y: none; -webkit-tap-highlight-color: transparent; }
 body.no-scroll { overflow: hidden; }
@@ -91,7 +95,6 @@ img { display: block; max-width: 100%; }
   margin: 0 calc(-1 * var(--gutter-r)) 0 calc(-1 * var(--gutter-l));
   padding: 0 var(--gutter-r) 2px var(--gutter-l);
 }
-.chips::-webkit-scrollbar { display: none; }
 .chip {
   position: relative; flex: none; display: inline-flex; align-items: center; gap: 4px;
   height: 32px; padding: 0 11px 0 13px; border-radius: 999px; background: var(--surface-2);
