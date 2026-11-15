@@ -98,7 +98,9 @@ export default function App() {
       notify(`„${film.title}“ ist schon in deiner Liste.`)
       return
     }
-    const entry: Film = { ...film, status: "watchlist", rating: null, answers: null, watchedAt: null, addedAt: new Date().toISOString() }
+    const entry: Film = {
+      ...film, status: "watchlist", rating: null, answers: null, watchedAt: null, fromNotes: false, addedAt: new Date().toISOString(),
+    }
     if (persist(() => addFilm(entry))) notify(`„${film.title}“ zur Watchlist hinzugefügt.`)
   }
 
@@ -115,6 +117,8 @@ export default function App() {
       // Beim ersten Markieren als gesehen = heute. Neu-Bewerten ändert das Datum nicht
       // (auch nicht bei importierten Filmen ohne bekanntes Datum).
       watchedAt: existing?.status === "watched" ? existing.watchedAt : now,
+      // Jetzt in der App per Fragebogen bewertet.
+      fromNotes: false,
     }
     if (persist(() => addFilm(updated))) {
       setRating(null)
@@ -124,7 +128,7 @@ export default function App() {
 
   function moveToWatchlist(film: Film) {
     if (!window.confirm(`„${film.title}“ zurück auf die Watchlist schieben? Bewertung und Antworten werden entfernt.`)) return
-    if (persist(() => updateFilm(film.tmdbId, { status: "watchlist", rating: null, answers: null, watchedAt: null }))) {
+    if (persist(() => updateFilm(film.tmdbId, { status: "watchlist", rating: null, answers: null, watchedAt: null, fromNotes: false }))) {
       notify(`„${film.title}“ ist wieder auf der Watchlist.`)
     }
   }
@@ -142,6 +146,10 @@ export default function App() {
 
   function saveNote(film: Film, note: string) {
     persist(() => updateFilm(film.tmdbId, { note }))
+  }
+
+  function setFromNotes(film: Film, fromNotes: boolean) {
+    persist(() => updateFilm(film.tmdbId, { fromNotes }))
   }
 
   function onImported(result: ImportResult) {
@@ -199,6 +207,7 @@ export default function App() {
           onMoveToWatchlist={moveToWatchlist}
           onDelete={deleteFilm}
           onSaveNote={saveNote}
+          onSetFromNotes={setFromNotes}
         />
       )}
 

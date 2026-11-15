@@ -15,6 +15,7 @@ export interface Film {
   note: string
   addedAt: string                 // ISO-Datum
   watchedAt: string | null        // ISO-Datum, wenn als gesehen markiert
+  fromNotes: boolean              // Bewertung aus den eigenen Notizen übernommen, nicht in der App bewertet
 }
 
 export interface Store {

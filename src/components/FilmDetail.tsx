@@ -15,6 +15,7 @@ interface Props {
   onMoveToWatchlist: (film: Film) => void
   onDelete: (film: Film) => void
   onSaveNote: (film: Film, note: string) => void
+  onSetFromNotes: (film: Film, fromNotes: boolean) => void
 }
 
 const ANSWER_LABEL: Record<Answer, { icon: string; text: string }> = {
@@ -24,7 +25,7 @@ const ANSWER_LABEL: Record<Answer, { icon: string; text: string }> = {
 }
 
 export default function FilmDetail({
-  film, saved, onClose, onRate, onAddToWatchlist, onMoveToWatchlist, onDelete, onSaveNote,
+  film, saved, onClose, onRate, onAddToWatchlist, onMoveToWatchlist, onDelete, onSaveNote, onSetFromNotes,
 }: Props) {
   const [note, setNote] = useState(film.note)
   const [noteFor, setNoteFor] = useState(film.note)
@@ -68,8 +69,15 @@ export default function FilmDetail({
                 <span className="result-number">{formatRating(film.rating)} / 5</span>
               </div>
             )}
-            {watched && film.rating !== null && !film.answers && (
-              <p className="hint">Bewertung übernommen (ohne Fragebogen)</p>
+            {watched && film.rating !== null && (
+              <label className="check">
+                <input
+                  type="checkbox"
+                  checked={film.fromNotes}
+                  onChange={(e) => onSetFromNotes(film, e.target.checked)}
+                />
+                <span>Aus meinen Notizen – nicht in der App bewertet</span>
+              </label>
             )}
             {saved && (
               <p className="detail-dates">

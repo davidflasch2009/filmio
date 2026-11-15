@@ -63,6 +63,8 @@ function checkFilm(x: unknown): FilmCheck {
   if (typeof f.note !== "string") return fail("note", "Text")
   if (!isIsoDate(f.addedAt)) return fail("addedAt", "ISO-Datum")
   if (!(f.watchedAt === null || isIsoDate(f.watchedAt))) return fail("watchedAt", "ISO-Datum oder null")
+  // Später ergänztes Feld: fehlt es (ältere Backups), gilt false.
+  if (!(f.fromNotes === undefined || typeof f.fromNotes === "boolean")) return fail("fromNotes", "true/false")
 
   return {
     ok: true,
@@ -80,6 +82,7 @@ function checkFilm(x: unknown): FilmCheck {
       note: f.note,
       addedAt: f.addedAt,
       watchedAt: f.watchedAt,
+      fromNotes: f.fromNotes ?? false,
     },
   }
 }
@@ -179,6 +182,7 @@ export function newFilm(info: FilmInfo, status: Status = "watchlist"): Film {
     note: "",
     addedAt: new Date().toISOString(),
     watchedAt: null,
+    fromNotes: false,
   }
 }
 

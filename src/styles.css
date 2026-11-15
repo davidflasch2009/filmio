@@ -178,6 +178,8 @@ div.card-main { cursor: default; }
 .detail-meta { margin: 0 0 8px; color: var(--muted); }
 .detail-rating { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 8px 0; }
 .detail-dates { color: var(--muted); font-size: 0.85rem; margin: 8px 0 0; }
+.check { display: flex; align-items: flex-start; gap: 8px; margin: 4px 0 6px; font-size: 0.85rem; color: var(--muted); cursor: pointer; }
+.check input { width: 18px; height: 18px; margin: 0; flex: none; accent-color: var(--accent); }
 .genres { list-style: none; display: flex; flex-wrap: wrap; gap: 6px; padding: 0; margin: 0 0 8px; }
 .genres li { font-size: 0.78rem; padding: 2px 8px; border-radius: 99px; background: var(--surface-2); }
 .detail-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 18px 0 6px; }
