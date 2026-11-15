@@ -29,6 +29,7 @@ export interface TmdbMovieDetails {
   release_date?: string
   overview?: string | null
   poster_path: string | null
+  backdrop_path?: string | null
   genres?: { id: number; name: string }[]
   runtime?: number | null
 }
@@ -80,6 +81,20 @@ export function posterUrl(path: string | null, size: "w185" | "w342" | "w500" = 
   return path ? `${IMG}/${size}${path}` : null
 }
 
+export function backdropUrl(path: string | null | undefined, size: "w780" | "w1280" = "w780") {
+  return path ? `${IMG}/${size}${path}` : null
+}
+
+/** Nur das Szenenbild eines Films (zum Nachladen für ältere Einträge). null = TMDB hat keins. */
+export async function fetchBackdropPath(id: number): Promise<string | null> {
+  try {
+    return (await getMovie(id)).backdrop_path ?? null
+  } catch (e) {
+    if (e instanceof TmdbError && e.status === 404) return null
+    throw e
+  }
+}
+
 /** "2019-05-30" → 2019 */
 export function yearFromDate(date: string | undefined | null): number | null {
   if (!date) return null
@@ -113,6 +128,7 @@ export async function loadFilmInfo(id: number): Promise<FilmInfo> {
     title: de.title || de.original_title || "Unbekannter Titel",
     year: yearFromDate(de.release_date),
     posterPath: de.poster_path ?? null,
+    backdropPath: de.backdrop_path ?? null,
     genres: (de.genres ?? []).map((g) => g.name),
     overview,
     runtime: de.runtime ? de.runtime : null,

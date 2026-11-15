@@ -2,6 +2,8 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react"
 import type { Film, Store } from "./types"
 import { addFilm, load, removeFilm, STORAGE_KEY, updateFilm, type ImportResult } from "./lib/storage"
 import { formatRating } from "./lib/format"
+import { fetchBackdropPath, hasToken } from "./lib/tmdb"
+import { useOnline } from "./hooks/useOnline"
 import { loadSettings, saveSettings, type GridSize } from "./lib/settings"
 import TabBar, { type Tab } from "./components/TabBar"
 import SearchView from "./components/SearchView"
@@ -17,32 +19,17 @@ interface Toast {
   undo?: () => void
 }
 
-function useOnline(): boolean {
-  const [online, setOnline] = useState(() => navigator.onLine)
-  useEffect(() => {
-    const on = () => setOnline(true)
-    const off = () => setOnline(false)
-    window.addEventListener("online", on)
-    window.addEventListener("offline", off)
-    return () => {
-      window.removeEventListener("online", on)
-      window.removeEventListener("offline", off)
-    }
-  }, [])
-  return online
-}
-
 export default function App() {
   const [store, setStore] = useState<Store>(load)
-  const [tab, setTab] = useState<Tab>("search")
+  const [tab, setTab] = useState<Tab>("watched")
   const [settings, setSettings] = useState(loadSettings)
   /** Geöffnete Detailansicht: gespeicherter Film (per tmdbId) oder Vorschau eines Suchtreffers (draft). */
-  const [detail, setDetail] = useState<{ tmdbId: number; draft: Film | null } | null>(null)
+  const [detail, setDetail] = useState<{ tmdbId: number; draft: Film | null; instant?: boolean } | null>(null)
   /** Film, der gerade bewertet wird. */
   const [rating, setRating] = useState<Film | null>(null)
   const [toast, setToast] = useState<Toast | null>(null)
   const online = useOnline()
-  const scrollPositions = useRef<Record<Tab, number>>({ search: 0, watched: 0, watchlist: 0, more: 0 })
+  const scrollPositions = useRef<Record<Tab, number>>({ watched: 0, watchlist: 0, search: 0, more: 0 })
 
   // Änderungen aus anderen Browser-Tabs übernehmen.
   useEffect(() => {
@@ -52,6 +39,28 @@ export default function App() {
     window.addEventListener("storage", onStorage)
     return () => window.removeEventListener("storage", onStorage)
   }, [])
+
+  // Szenenbilder für Filme nachladen, die noch keins haben (z.B. aus einem Import oder älteren Versionen).
+  const needsBackdrops = store.films.some((f) => f.backdropPath === undefined)
+  useEffect(() => {
+    if (!online || !hasToken || !needsBackdrops) return
+    let cancelled = false
+    const queue = load().films.filter((f) => f.backdropPath === undefined).map((f) => f.tmdbId)
+    const worker = async () => {
+      while (queue.length && !cancelled) {
+        const id = queue.shift()!
+        try {
+          const backdropPath = await fetchBackdropPath(id)
+          if (cancelled) return
+          setStore(updateFilm(id, { backdropPath }))
+        } catch {
+          // Netzfehler o.ä.: beim nächsten Start erneut versuchen.
+        }
+      }
+    }
+    void Promise.all([worker(), worker(), worker()])
+    return () => { cancelled = true }
+  }, [online, needsBackdrops])
 
   useEffect(() => {
     if (!toast) return
@@ -114,7 +123,6 @@ export default function App() {
       status: "watched",
       rating: result.rating,
       answers: result.answers,
-      note: result.note,
       addedAt: existing?.addedAt ?? now,
       // Beim ersten Markieren als gesehen = heute. Neu-Bewerten ändert das Datum nicht
       // (auch nicht bei importierten Filmen ohne bekanntes Datum).
@@ -124,7 +132,9 @@ export default function App() {
     }
     if (persist(() => addFilm(updated))) {
       setRating(null)
-      notify(`„${film.title}“ gespeichert: ★ ${formatRating(result.rating)}`)
+      // Nach der Enthüllung direkt auf der Detailseite des Films landen.
+      setDetail((d) => ({ tmdbId: film.tmdbId, draft: null, instant: d?.tmdbId !== film.tmdbId }))
+      notify(`Gespeichert · ★ ${formatRating(result.rating)}`)
     }
   }
 
@@ -170,45 +180,37 @@ export default function App() {
   const savedDetail = detail ? findSaved(detail.tmdbId) : undefined
   const detailFilm = savedDetail ?? detail?.draft ?? null
 
-  const watchedCount = store.films.filter((f) => f.status === "watched").length
-  const counts = { watched: watchedCount, watchlist: store.films.length - watchedCount }
-
   return (
     <div className="app" data-grid={settings.gridSize}>
-      <header className="app-header">
-        <span className="logo">filmio</span>
-        {!online && <span className="offline-pill">offline</span>}
-      </header>
-
       <main className="main">
+        <div hidden={tab !== "watched"}>
+          <WatchedView films={store.films} onOpen={openSaved} onFindFilms={() => changeTab("search")} />
+        </div>
+        <div hidden={tab !== "watchlist"}>
+          <WatchlistView films={store.films} onOpen={openSaved} onMarkWatched={setRating} onFindFilms={() => changeTab("search")} />
+        </div>
         <div hidden={tab !== "search"}>
           <SearchView
             films={store.films}
-            online={online}
             onAddToWatchlist={addToWatchlist}
             onRate={setRating}
             onOpenDetail={openDetail}
             onError={notify}
           />
         </div>
-        <div hidden={tab !== "watched"}>
-          <WatchedView films={store.films} onOpen={openSaved} />
-        </div>
-        <div hidden={tab !== "watchlist"}>
-          <WatchlistView films={store.films} onOpen={openSaved} onMarkWatched={setRating} />
-        </div>
         <div hidden={tab !== "more"}>
           <MoreView store={store} onImported={onImported} gridSize={settings.gridSize} onGridSizeChange={changeGridSize} />
         </div>
       </main>
 
-      <TabBar active={tab} onChange={changeTab} counts={counts} />
+      <TabBar active={tab} onChange={changeTab} />
 
       {detailFilm && (
         <FilmDetail
           key={detailFilm.tmdbId}
           film={detailFilm}
           saved={savedDetail !== undefined}
+          instant={detail?.instant}
           onClose={() => setDetail(null)}
           onRate={setRating}
           onAddToWatchlist={addToWatchlist}
@@ -231,7 +233,7 @@ export default function App() {
       {toast && (
         <div className="toast" role="status" key={toast.id}>
           <span>{toast.text}</span>
-          {toast.undo && <button type="button" className="btn-link" onClick={toast.undo}>Rückgängig</button>}
+          {toast.undo && <button type="button" className="text-btn" onClick={toast.undo}>Rückgängig</button>}
         </div>
       )}
     </div>

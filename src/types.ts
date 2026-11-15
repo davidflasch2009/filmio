@@ -16,6 +16,7 @@ export interface Film {
   addedAt: string                 // ISO-Datum
   watchedAt: string | null        // ISO-Datum, wenn als gesehen markiert
   fromNotes: boolean              // Bewertung aus den eigenen Notizen übernommen, nicht in der App bewertet
+  backdropPath?: string | null    // Szenenbild für die Detailseite; fehlt = noch nicht von TMDB geholt
 }
 
 export interface Store {
@@ -24,4 +25,4 @@ export interface Store {
 }
 
 /** Die von TMDB übernommenen (gecachten) Felder eines Films. */
-export type FilmInfo = Pick<Film, "tmdbId" | "title" | "year" | "posterPath" | "genres" | "overview" | "runtime">
+export type FilmInfo = Pick<Film, "tmdbId" | "title" | "year" | "posterPath" | "backdropPath" | "genres" | "overview" | "runtime">

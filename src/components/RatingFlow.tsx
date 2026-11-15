@@ -1,46 +1,113 @@
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useRef, useState, type ReactNode } from "react"
 import type { Answer, Film } from "../types"
 import { QUESTIONS, scoreFromAnswers } from "../lib/scoring"
 import { formatRating } from "../lib/format"
+import { starFillPercent } from "../lib/stars"
 import StarRating from "./StarRating"
-import { Poster } from "./FilmCard"
+import { IconCheck, IconChevronLeft, IconMinus, IconX } from "./Icons"
 
 export interface RatingResult {
   answers: Answer[]
   rating: number
-  note: string
 }
 
 interface Props {
-  film: Pick<Film, "title" | "year" | "posterPath" | "answers" | "note">
+  film: Pick<Film, "title" | "answers">
   onCancel: () => void
+  /** Wird nach der Sterne-Enthüllung aufgerufen. */
   onSave: (result: RatingResult) => void
 }
 
-const OPTIONS: { value: Answer; label: string }[] = [
-  { value: "ja", label: "Ja" },
-  { value: "neutral", label: "Neutral" },
-  { value: "nein", label: "Nein" },
+const OPTIONS: { value: Answer; label: string; icon: ReactNode }[] = [
+  { value: "ja", label: "Ja", icon: <IconCheck /> },
+  { value: "neutral", label: "Neutral", icon: <IconMinus /> },
+  { value: "nein", label: "Nein", icon: <IconX /> },
 ]
-
 const LABEL: Record<Answer, string> = { ja: "Ja", neutral: "Neutral", nein: "Nein" }
 
 /** Sperrzeit nach einer Antwort, damit ein Doppel-Tipp nicht die nächste Frage mitbeantwortet. */
 const TAP_LOCK_MS = 300
 
-/** Fragebogen: eine Frage pro Screen, Auto-Weiter, am Ende Sterne + Notiz + Speichern. */
+const prefersReducedMotion = () => window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false
+
+/**
+ * Enthüllung: nur fünf leere Sterne, die sich je nach Bewertung langsam füllen,
+ * dann blendet die Zahl ein. Ein Tipp überspringt die Animation.
+ */
+function StarReveal({ rating, onDone }: { rating: number; onDone: () => void }) {
+  const fillRef = useRef<HTMLSpanElement>(null)
+  // Bei reduzierter Bewegung sofort vollständig zeigen.
+  const [showNumber, setShowNumber] = useState(prefersReducedMotion)
+  const timers = useRef<number[]>([])
+  const finished = useRef(false)
+  const onDoneRef = useRef(onDone)
+  useEffect(() => { onDoneRef.current = onDone })
+
+  const target = `${starFillPercent(rating)}%`
+
+  useEffect(() => {
+    const el = fillRef.current
+    if (!el) return
+    const local: number[] = []
+    timers.current = local
+    const later = (fn: () => void, ms: number) => { local.push(window.setTimeout(fn, ms)) }
+    const finish = () => {
+      if (finished.current) return
+      finished.current = true
+      onDoneRef.current()
+    }
+    if (prefersReducedMotion()) {
+      el.style.width = target
+      later(finish, 1400)
+    } else {
+      // kurze Pause mit leeren Sternen, dann füllen (Dauer wächst mit der Bewertung, am Ende langsamer)
+      later(() => {
+        const duration = 700 + rating * 340
+        el.style.transition = `width ${duration}ms cubic-bezier(.4,.1,.3,1)`
+        el.style.width = target
+        later(() => {
+          setShowNumber(true)
+          later(finish, 1100)
+        }, duration + 80)
+      }, 550)
+    }
+    return () => { local.forEach(clearTimeout) }
+  }, [rating, target])
+
+  function skip() {
+    if (finished.current) return
+    timers.current.forEach(clearTimeout)
+    const el = fillRef.current
+    if (el) {
+      el.style.transition = "none"
+      el.style.width = target
+    }
+    setShowNumber(true)
+    timers.current = [window.setTimeout(() => {
+      if (finished.current) return
+      finished.current = true
+      onDoneRef.current()
+    }, 500)]
+  }
+
+  return (
+    <div className="reveal" onClick={skip} role="status" aria-label={`Deine Bewertung: ${formatRating(rating)} von 5 Sternen`}>
+      <StarRating value={rating} size={46} fillRef={fillRef} startEmpty />
+      <div className={`reveal-number${showNumber ? " show" : ""}`} aria-hidden="true">{formatRating(rating)}</div>
+    </div>
+  )
+}
+
+/** Fragebogen: eine Frage pro Screen, Auto-Weiter, danach die Sterne-Enthüllung. */
 export default function RatingFlow({ film, onCancel, onSave }: Props) {
   const total = QUESTIONS.length
-  const [step, setStep] = useState(0) // 0..total-1 = Fragen, total = Ergebnis
+  const [step, setStep] = useState(0)
   const [answers, setAnswers] = useState<(Answer | undefined)[]>(() => Array(total).fill(undefined))
-  const [note, setNote] = useState(film.note ?? "")
+  const [result, setResult] = useState<RatingResult | null>(null)
   const lockUntil = useRef(0)
   const headingRef = useRef<HTMLHeadingElement>(null)
 
   const previous = film.answers && film.answers.length === total ? film.answers : null
-  const done = step >= total
-  const complete = answers.every((a): a is Answer => a !== undefined)
-  const rating = complete ? scoreFromAnswers(answers as Answer[]) : null
 
   useEffect(() => {
     headingRef.current?.focus()
@@ -48,14 +115,17 @@ export default function RatingFlow({ film, onCancel, onSave }: Props) {
 
   function answer(value: Answer) {
     const now = Date.now()
-    if (now < lockUntil.current) return
+    if (now < lockUntil.current || result) return
     lockUntil.current = now + TAP_LOCK_MS
-    setAnswers((prev) => {
-      const next = [...prev]
-      next[step] = value
-      return next
-    })
-    setStep((s) => Math.min(total, s + 1))
+    const next = [...answers]
+    next[step] = value
+    setAnswers(next)
+    if (step === total - 1) {
+      const complete = next as Answer[]
+      setResult({ answers: complete, rating: scoreFromAnswers(complete) })
+    } else {
+      setStep(step + 1)
+    }
   }
 
   function back() {
@@ -68,71 +138,47 @@ export default function RatingFlow({ film, onCancel, onSave }: Props) {
     if (!answered || window.confirm("Bewertung abbrechen? Deine Antworten gehen verloren.")) onCancel()
   }
 
-  function save() {
-    if (!complete || rating === null) return
-    onSave({ answers: answers as Answer[], rating, note: note.trim() })
-  }
-
   return (
     <div className="overlay rating-flow" role="dialog" aria-modal="true" aria-label={`Bewertung: ${film.title}`}>
-      <header className="overlay-header">
-        <button type="button" className="btn-link" onClick={cancel}>✕ Abbrechen</button>
-        <span className="overlay-title">{film.title}{film.year ? ` (${film.year})` : ""}</span>
-      </header>
-
-      <div className="progress" aria-hidden="true">
-        <div className="progress-bar" style={{ width: `${(Math.min(step, total) / total) * 100}%` }} />
-      </div>
-
-      {!done ? (
-        <section className="question">
-          <p className="question-count" aria-live="polite">Frage {step + 1}/{total}</p>
-          <h2 className="question-text" ref={headingRef} tabIndex={-1}>{QUESTIONS[step]}</h2>
-          <div className="answer-buttons">
-            {OPTIONS.map((o) => (
-              <button
-                key={o.value}
-                type="button"
-                className={`answer answer-${o.value}${answers[step] === o.value ? " answer-selected" : ""}`}
-                aria-pressed={answers[step] === o.value}
-                onClick={() => answer(o.value)}
-              >
-                {o.label}
-              </button>
-            ))}
-          </div>
-          {previous && <p className="hint">Letztes Mal: {LABEL[previous[step]]}</p>}
-          <div className="question-nav">
-            <button type="button" className="btn" onClick={back} disabled={step === 0}>← Zurück</button>
-            {answers[step] !== undefined && (
-              <button type="button" className="btn" onClick={() => setStep((s) => s + 1)}>Weiter →</button>
-            )}
-          </div>
-        </section>
+      {result ? (
+        <StarReveal rating={result.rating} onDone={() => onSave(result)} />
       ) : (
-        <section className="result">
-          <Poster path={film.posterPath} title={film.title} variant="large" />
-          <h2 className="result-heading" ref={headingRef} tabIndex={-1}>Deine Bewertung</h2>
-          {rating !== null && (
-            <div className="result-score">
-              <StarRating value={rating} size="lg" />
-              <span className="result-number">{formatRating(rating)} / 5</span>
-            </div>
-          )}
-          <label className="field">
-            <span>Notiz (optional)</span>
-            <textarea
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              rows={4}
-              placeholder="Was willst du dir zu dem Film merken?"
-            />
-          </label>
-          <div className="result-actions">
-            <button type="button" className="btn" onClick={back}>← Antworten ändern</button>
-            <button type="button" className="btn btn-primary" onClick={save} disabled={!complete}>Speichern</button>
+        <>
+          <header className="rf-top">
+            <button type="button" className="round-btn" onClick={cancel} aria-label="Bewertung abbrechen"><IconX /></button>
+            <span className="rf-film">{film.title}</span>
+            <span className="rf-count">{step + 1}/{total}</span>
+          </header>
+          <div className="rf-progress" aria-hidden="true">
+            {QUESTIONS.map((q, i) => <i key={q} className={i < step ? "done" : i === step ? "current" : undefined} />)}
           </div>
-        </section>
+
+          <section className="question">
+            <p className="question-count" aria-live="polite">Frage {step + 1} von {total}</p>
+            <h2 className="question-text" ref={headingRef} tabIndex={-1}>{QUESTIONS[step]}</h2>
+            <div className="answer-buttons">
+              {OPTIONS.map((o) => (
+                <button
+                  key={o.value}
+                  type="button"
+                  className={`answer answer-${o.value}${answers[step] === o.value ? " answer-selected" : ""}`}
+                  aria-pressed={answers[step] === o.value}
+                  onClick={() => answer(o.value)}
+                >
+                  {o.icon}
+                  <span>{o.label}</span>
+                </button>
+              ))}
+            </div>
+            {previous && <p className="hint question-previous">Letztes Mal: {LABEL[previous[step]]}</p>}
+            <div className="question-nav">
+              <button type="button" className="text-btn" onClick={back} disabled={step === 0}><IconChevronLeft />Zurück</button>
+              {answers[step] !== undefined && step < total - 1 && (
+                <button type="button" className="text-btn" onClick={() => setStep(step + 1)}>Weiter</button>
+              )}
+            </div>
+          </section>
+        </>
       )}
     </div>
   )

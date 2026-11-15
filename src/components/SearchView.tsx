@@ -4,10 +4,12 @@ import { hasToken, loadFilmInfo, searchMovies, yearFromDate, type TmdbSearchResu
 import { newFilm } from "../lib/storage"
 import { formatRating } from "../lib/format"
 import FilmCard from "./FilmCard"
+import ViewHeader from "./ViewHeader"
+import { IconCheck, IconPlus, IconSearch } from "./Icons"
+import { useOnline } from "../hooks/useOnline"
 
 interface Props {
   films: Film[]
-  online: boolean
   onAddToWatchlist: (film: Film) => void
   onRate: (film: Film) => void
   onOpenDetail: (film: Film, saved: boolean) => void
@@ -17,7 +19,8 @@ interface Props {
 
 const DEBOUNCE_MS = 450
 
-export default function SearchView({ films, online, onAddToWatchlist, onRate, onOpenDetail, onError }: Props) {
+export default function SearchView({ films, onAddToWatchlist, onRate, onOpenDetail, onError }: Props) {
+  const online = useOnline()
   const [query, setQuery] = useState("")
   const [results, setResults] = useState<TmdbSearchResult[] | null>(null)
   const [searchedFor, setSearchedFor] = useState("")
@@ -91,21 +94,23 @@ export default function SearchView({ films, online, onAddToWatchlist, onRate, on
 
   return (
     <section className="view" aria-labelledby="search-heading">
-      <h1 id="search-heading" className="view-title">Suche</h1>
-
-      <form className="searchbar" role="search" onSubmit={onSubmit}>
-        <input
-          type="search"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Film suchen …"
-          aria-label="Film bei TMDB suchen"
-          enterKeyHint="search"
-          autoComplete="off"
-          disabled={!hasToken}
-        />
-        <button type="submit" className="btn btn-primary" disabled={!hasToken || !online || !query.trim()}>Suchen</button>
-      </form>
+      <ViewHeader id="search-heading" title="Suche" subtitle="Filme bei TMDB finden">
+        <form role="search" onSubmit={onSubmit}>
+          <label className="search-field">
+            <IconSearch />
+            <input
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Filmtitel"
+              aria-label="Film bei TMDB suchen"
+              enterKeyHint="search"
+              autoComplete="off"
+              disabled={!hasToken}
+            />
+          </label>
+        </form>
+      </ViewHeader>
 
       {!hasToken && (
         <p className="notice notice-error">
@@ -115,7 +120,7 @@ export default function SearchView({ films, online, onAddToWatchlist, onRate, on
       )}
       {!online && <p className="notice notice-offline">Offline – Suche braucht Internet</p>}
       {error && <p className="notice notice-error" role="alert">{error}</p>}
-      {loading && <p className="hint" aria-live="polite">Suche läuft …</p>}
+      {loading && <p className="hint search-loading" aria-live="polite">Suche läuft …</p>}
 
       {results && !loading && results.length === 0 && (
         <p className="empty">Keine Treffer für „{searchedFor}“.</p>
@@ -130,7 +135,7 @@ export default function SearchView({ films, online, onAddToWatchlist, onRate, on
             const badge = saved
               ? saved.status === "watched"
                 ? `✓ Gesehen${saved.rating !== null ? ` · ★ ${formatRating(saved.rating)}` : ""}`
-                : "In Watchlist"
+                : "Auf der Watchlist"
               : busy ? "lädt …" : undefined
             return (
               <FilmCard
@@ -142,15 +147,15 @@ export default function SearchView({ films, online, onAddToWatchlist, onRate, on
                 onOpen={() => (saved ? onOpenDetail(saved, true) : void withDetails(r.id, (f) => onOpenDetail(f, false)))}
               >
                 {!saved && (
-                  <button type="button" className="btn btn-small" disabled={busyId !== null}
-                    onClick={() => void withDetails(r.id, onAddToWatchlist)}>
-                    ＋ Watchlist
+                  <button type="button" className="pill" disabled={busyId !== null}
+                    onClick={() => void withDetails(r.id, onAddToWatchlist)} aria-label={`${r.title} auf die Watchlist`}>
+                    <IconPlus />Watchlist
                   </button>
                 )}
                 {(!saved || saved.status === "watchlist") && (
-                  <button type="button" className="btn btn-small btn-primary" disabled={busyId !== null}
-                    onClick={() => (saved ? onRate(saved) : void withDetails(r.id, onRate))}>
-                    ✓ Gesehen
+                  <button type="button" className="pill pill-accent" disabled={busyId !== null}
+                    onClick={() => (saved ? onRate(saved) : void withDetails(r.id, onRate))} aria-label={`${r.title} als gesehen bewerten`}>
+                    <IconCheck />Gesehen
                   </button>
                 )}
               </FilmCard>

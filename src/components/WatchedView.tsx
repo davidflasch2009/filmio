@@ -1,31 +1,34 @@
 import { useMemo, useState } from "react"
 import type { Film } from "../types"
-import { normalizeText } from "../lib/format"
+import { formatRating, normalizeText } from "../lib/format"
 import FilmCard from "./FilmCard"
+import FilterChip from "./FilterChip"
+import ViewHeader from "./ViewHeader"
+import { IconSearch } from "./Icons"
 
 type SortKey = "rating-desc" | "rating-asc" | "added-desc" | "watched-desc" | "title"
 
-const SORTS: { id: SortKey; label: string }[] = [
-  { id: "rating-desc", label: "Bewertung ↓" },
-  { id: "rating-asc", label: "Bewertung ↑" },
-  { id: "added-desc", label: "Hinzugefügt am (neueste)" },
-  { id: "watched-desc", label: "Gesehen am (neueste)" },
-  { id: "title", label: "Titel A–Z" },
+const SORTS: { value: SortKey; label: string }[] = [
+  { value: "rating-desc", label: "Bewertung ↓" },
+  { value: "rating-asc", label: "Bewertung ↑" },
+  { value: "added-desc", label: "Zuletzt hinzugefügt" },
+  { value: "watched-desc", label: "Zuletzt gesehen" },
+  { value: "title", label: "Titel A–Z" },
 ]
 
-const MIN_RATINGS = [0, 1, 2, 3, 3.5, 4, 4.5, 5]
 /** Spezialwert im Bewertungsfilter: nur Filme ohne Bewertung (z.B. importierte). */
 const UNRATED = -1
 
 interface Props {
   films: Film[]
   onOpen: (film: Film) => void
+  onFindFilms: () => void
 }
 
 const byTitle = (a: Film, b: Film) => a.title.localeCompare(b.title, "de", { sensitivity: "base" })
 const time = (iso: string | null) => (iso ? Date.parse(iso) || 0 : 0)
 
-export default function WatchedView({ films, onOpen }: Props) {
+export default function WatchedView({ films, onOpen, onFindFilms }: Props) {
   const [sort, setSort] = useState<SortKey>("rating-desc")
   const [genre, setGenre] = useState("")
   const [minRating, setMinRating] = useState(0)
@@ -36,6 +39,16 @@ export default function WatchedView({ films, onOpen }: Props) {
     () => [...new Set(watched.flatMap((f) => f.genres))].sort((a, b) => a.localeCompare(b, "de")),
     [watched],
   )
+  const rated = watched.filter((f) => f.rating !== null)
+  const average = rated.length ? rated.reduce((s, f) => s + (f.rating ?? 0), 0) / rated.length : null
+  const unratedCount = watched.length - rated.length
+
+  const minOptions = [
+    { value: 0, label: "Alle Sterne" },
+    { value: 5, label: "★ 5" },
+    ...[4.5, 4, 3.5, 3, 2, 1].map((r) => ({ value: r, label: `ab ★ ${formatRating(r).replace(",0", "")}` })),
+    { value: UNRATED, label: `Nicht bewertet (${unratedCount})` },
+  ]
 
   const visible = useMemo(() => {
     const q = normalizeText(query.trim())
@@ -66,7 +79,6 @@ export default function WatchedView({ films, onOpen }: Props) {
   }, [watched, sort, genre, minRating, query])
 
   const filtered = genre !== "" || minRating !== 0 || query.trim() !== ""
-  const unratedCount = watched.filter((f) => f.rating === null).length
 
   function resetFilters() {
     setGenre("")
@@ -74,57 +86,58 @@ export default function WatchedView({ films, onOpen }: Props) {
     setQuery("")
   }
 
+  const subtitle = watched.length === 0
+    ? undefined
+    : `${watched.length} ${watched.length === 1 ? "Film" : "Filme"}${average !== null ? ` · im Schnitt ${formatRating(Math.round(average * 10) / 10)} ★` : ""}`
+
   return (
     <section className="view" aria-labelledby="watched-heading">
-      <h1 id="watched-heading" className="view-title">Gesehen <span className="view-count">{watched.length}</span></h1>
+      <ViewHeader id="watched-heading" title="Gesehen" subtitle={subtitle}>
+        {watched.length > 0 && (
+          <>
+            <label className="search-field">
+              <IconSearch />
+              <input
+                type="search"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="In „Gesehen“ suchen"
+                aria-label="In gesehenen Filmen suchen"
+                autoComplete="off"
+              />
+            </label>
+            <div className="chips">
+              <FilterChip id="watched-sort" label="Sortieren" options={SORTS} value={sort} onChange={setSort} active={sort !== "rating-desc"} />
+              <FilterChip
+                id="watched-genre"
+                label="Genre"
+                options={[{ value: "", label: "Alle Genres" }, ...genres.map((g) => ({ value: g, label: g }))]}
+                value={genre}
+                onChange={setGenre}
+                active={genre !== ""}
+                idleLabel="Genre"
+              />
+              <FilterChip id="watched-rating" label="Bewertung" options={minOptions} value={minRating} onChange={setMinRating} active={minRating !== 0} idleLabel="Sterne" />
+            </div>
+          </>
+        )}
+      </ViewHeader>
 
       {watched.length === 0 ? (
-        <p className="empty">Noch keine gesehenen Filme. Such einen Film und tippe „✓ Gesehen“.</p>
+        <div className="empty">
+          <p>Noch keine gesehenen Filme.</p>
+          <button type="button" className="btn btn-primary" onClick={onFindFilms}>Film suchen</button>
+        </div>
       ) : (
         <>
-          <div className="toolbar">
-            <input
-              type="search"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="In „Gesehen“ suchen …"
-              aria-label="In gesehenen Filmen suchen"
-            />
-            <div className="toolbar-row">
-              <label className="select">
-                <span>Sortieren</span>
-                <select value={sort} onChange={(e) => setSort(e.target.value as SortKey)}>
-                  {SORTS.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
-                </select>
-              </label>
-              <label className="select">
-                <span>Genre</span>
-                <select value={genre} onChange={(e) => setGenre(e.target.value)}>
-                  <option value="">Alle Genres</option>
-                  {genres.map((g) => <option key={g} value={g}>{g}</option>)}
-                </select>
-              </label>
-              <label className="select">
-                <span>Bewertung</span>
-                <select value={minRating} onChange={(e) => setMinRating(Number(e.target.value))}>
-                  {MIN_RATINGS.map((r) => (
-                    <option key={r} value={r}>{r === 0 ? "Alle" : r === 5 ? "★ 5" : `ab ★ ${String(r).replace(".", ",")}`}</option>
-                  ))}
-                  <option value={UNRATED}>Nicht bewertet ({unratedCount})</option>
-                </select>
-              </label>
-            </div>
-          </div>
-
           {filtered && (
-            <p className="hint">
+            <p className="filter-info">
               {visible.length} von {watched.length} Filmen ·{" "}
-              <button type="button" className="btn-link" onClick={resetFilters}>Filter zurücksetzen</button>
+              <button type="button" className="text-btn text-btn-inline" onClick={resetFilters}>Filter zurücksetzen</button>
             </p>
           )}
-
           {visible.length === 0 ? (
-            <p className="empty">Keine Filme passen zu Suche/Filter.</p>
+            <p className="empty">Keine Filme passen zu Suche oder Filter.</p>
           ) : (
             <div className="grid">
               {visible.map((f) => (

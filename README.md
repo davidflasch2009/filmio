@@ -56,16 +56,26 @@ Einmalig einrichten:
 
 ```
 src/
-├─ App.tsx              Tab-State, Layout, Detail-/Bewertungs-Overlays
+├─ App.tsx              Tabs, Layout, Detail-/Bewertungs-Ebenen, Nachladen der Szenenbilder
 ├─ types.ts             Film / Store / Answer
-├─ styles.css           schlichtes Styling (Design folgt später)
+├─ styles.css           Design „Apple TV“ (dunkel, Systemschrift, Gelb als Akzent)
+├─ hooks/useOnline.ts   Online-/Offline-Status
 ├─ lib/
 │  ├─ storage.ts        localStorage-CRUD + Export/Import + Validierung
-│  ├─ tmdb.ts           TMDB-Client (de-DE, en-US-Fallback für die Handlung)
+│  ├─ tmdb.ts           TMDB-Client (de-DE, en-US-Fallback für die Handlung, Poster/Szenenbilder)
 │  ├─ scoring.ts        die 15 Fragen + Score-Formel
+│  ├─ settings.ts       Darstellung (Kartengröße), gerätebezogen
+│  ├─ stars.ts          Füllbreite für halbe Sterne
 │  └─ format.ts         Formatierungs-Helfer (Sterne, Datum, Laufzeit)
-└─ components/          TabBar, Views, FilmCard, FilmDetail, RatingFlow, StarRating
+└─ components/          TabBar, ViewHeader, Views, FilmCard, FilterChip, FilmDetail, RatingFlow (inkl. Sterne-Enthüllung), StarRating, Icons
 ```
+
+## Design
+
+Dunkel, ruhig, große Bilder – angelehnt an Apple TV. Die App startet in **Gesehen**, die Tabs sind
+Gesehen · Watchlist · Suche · Mehr. Die Detailseite zeigt oben ein Szenenbild des Films (TMDB-Backdrop;
+für ältere Einträge lädt die App es beim nächsten Start mit Internet nach). Nach der letzten Frage füllen
+sich fünf Sterne bis zur berechneten Bewertung, danach wird automatisch gespeichert.
 
 ## Attribution
 

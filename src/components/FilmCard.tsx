@@ -57,15 +57,19 @@ interface Props {
   children?: ReactNode
 }
 
-/** Karte für Listen und Suchtreffer: Poster, Titel, Jahr, optional Sterne/Badge/Buttons. */
+/** Karte für Listen und Suchtreffer: Poster, Titel, Sterne + Jahr, optional Hinweis und Buttons. */
 export default function FilmCard({ title, year, posterPath, rating, badge, onOpen, children }: Props) {
   const body = (
     <>
       <Poster path={posterPath} title={title} />
       <span className="card-text">
         <span className="card-title">{title}</span>
-        {year !== null && <span className="card-year">{year}</span>}
-        {rating != null && <StarRating value={rating} size="sm" />}
+        {(rating != null || year !== null) && (
+          <span className="card-meta">
+            {rating != null && <StarRating value={rating} size={11} />}
+            {year !== null && <span className="card-year">{year}</span>}
+          </span>
+        )}
         {badge && <span className="card-badge">{badge}</span>}
       </span>
     </>
@@ -74,9 +78,7 @@ export default function FilmCard({ title, year, posterPath, rating, badge, onOpe
   return (
     <article className="card">
       {onOpen ? (
-        <button type="button" className="card-main" onClick={onOpen} title="Details öffnen">
-          {body}
-        </button>
+        <button type="button" className="card-main" onClick={onOpen} title="Details öffnen">{body}</button>
       ) : (
         <div className="card-main">{body}</div>
       )}

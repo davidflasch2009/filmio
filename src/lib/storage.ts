@@ -65,6 +65,7 @@ function checkFilm(x: unknown): FilmCheck {
   if (!(f.watchedAt === null || isIsoDate(f.watchedAt))) return fail("watchedAt", "ISO-Datum oder null")
   // Später ergänztes Feld: fehlt es (ältere Backups), gilt false.
   if (!(f.fromNotes === undefined || typeof f.fromNotes === "boolean")) return fail("fromNotes", "true/false")
+  if (!(f.backdropPath === undefined || isNullableString(f.backdropPath))) return fail("backdropPath", "Text oder null")
 
   return {
     ok: true,
@@ -83,6 +84,8 @@ function checkFilm(x: unknown): FilmCheck {
       addedAt: f.addedAt,
       watchedAt: f.watchedAt,
       fromNotes: f.fromNotes ?? false,
+      // Fehlt das Feld, holt die App das Szenenbild später nach.
+      ...(f.backdropPath === undefined ? {} : { backdropPath: f.backdropPath }),
     },
   }
 }

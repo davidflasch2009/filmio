@@ -3,6 +3,8 @@ import type { Store } from "../types"
 import { exportJson, importJson, type ImportMode, type ImportResult } from "../lib/storage"
 import { GRID_SIZES, type GridSize } from "../lib/settings"
 import tmdbLogo from "../assets/tmdb-logo.svg"
+import ViewHeader from "./ViewHeader"
+import { IconCheck, IconChevronRight, IconDownload, IconUpload } from "./Icons"
 
 interface Props {
   store: Store
@@ -66,63 +68,79 @@ export default function MoreView({ store, onImported, gridSize, onGridSizeChange
 
   return (
     <section className="view" aria-labelledby="more-heading">
-      <h1 id="more-heading" className="view-title">Mehr</h1>
+      <ViewHeader id="more-heading" title="Mehr" />
 
-      <section className="panel">
-        <h2>Darstellung</h2>
-        <fieldset className="segmented">
+      <h2 className="group-label">Darstellung</h2>
+      <div className="group">
+        <fieldset className="group-row segmented">
           <legend>Größe der Filmkarten</legend>
-          {GRID_SIZES.map((g) => (
-            <label key={g.id} className={gridSize === g.id ? "segment segment-active" : "segment"}>
-              <input
-                type="radio"
-                name="grid-size"
-                value={g.id}
-                checked={gridSize === g.id}
-                onChange={() => onGridSizeChange(g.id)}
-              />
-              <span className="segment-label">{g.label}</span>
-              <span className="segment-hint">{g.hint}</span>
-            </label>
-          ))}
+          <div className="segments">
+            {GRID_SIZES.map((g) => (
+              <label key={g.id} className={gridSize === g.id ? "segment segment-active" : "segment"}>
+                <input
+                  type="radio"
+                  name="grid-size"
+                  value={g.id}
+                  checked={gridSize === g.id}
+                  onChange={() => onGridSizeChange(g.id)}
+                />
+                <span className="segment-label">{g.label}</span>
+                <span className="segment-hint">{g.hint}</span>
+              </label>
+            ))}
+          </div>
         </fieldset>
-      </section>
+      </div>
 
-      <section className="panel">
-        <h2>Daten sichern</h2>
-        <p className="hint">
-          Deine Liste liegt nur in diesem Browser ({watched} gesehen, {watchlist} auf der Watchlist).
-          Exportiere regelmäßig ein Backup.
-        </p>
-        <button type="button" className="btn btn-primary" onClick={onExport}>⬇ Export (JSON)</button>
-      </section>
+      <h2 className="group-label">Daten</h2>
+      <div className="group">
+        <button type="button" className="group-row row-button" onClick={onExport}>
+          <span className="row-icon"><IconDownload /></span>
+          <span className="row-text">Backup exportieren</span>
+          <IconChevronRight className="row-chevron" />
+        </button>
+      </div>
+      <p className="group-note">
+        Deine Liste liegt nur auf diesem Gerät ({watched} gesehen, {watchlist} auf der Watchlist).
+        Exportiere regelmäßig ein Backup.
+      </p>
 
-      <section className="panel">
-        <h2>Import</h2>
-        <form onSubmit={onImport} className="import-form">
-          <label className="field">
-            <span>Backup-Datei (.json)</span>
-            <input
-              ref={fileRef}
-              type="file"
-              accept=".json,application/json"
-              onChange={(e) => { setFile(e.target.files?.[0] ?? null); setMessage(null) }}
-            />
+      <form onSubmit={onImport} className="group import-form">
+        <label className="group-row row-button">
+          <span className="row-icon"><IconUpload /></span>
+          <span className="row-text">{file ? file.name : "Backup-Datei auswählen"}</span>
+          <IconChevronRight className="row-chevron" />
+          <input
+            ref={fileRef}
+            className="file-input"
+            type="file"
+            accept=".json,application/json"
+            onChange={(e) => { setFile(e.target.files?.[0] ?? null); setMessage(null) }}
+          />
+        </label>
+        <fieldset className="radio-group">
+          <legend className="vh">Vorhandene Daten</legend>
+          <label className="group-row radio-row">
+            <input type="radio" name="import-mode" value="merge" checked={mode === "merge"} onChange={() => setMode("merge")} />
+            <span className="row-text">
+              Zusammenführen
+              <span className="row-sub">Gleiche Filme werden überschrieben, neue ergänzt</span>
+            </span>
+            <IconCheck className="radio-check" />
           </label>
-          <fieldset className="radio-group">
-            <legend>Vorhandene Daten</legend>
-            <label>
-              <input type="radio" name="import-mode" value="merge" checked={mode === "merge"} onChange={() => setMode("merge")} />
-              Zusammenführen <span className="hint">(gleiche Filme werden überschrieben, neue ergänzt)</span>
-            </label>
-            <label>
-              <input type="radio" name="import-mode" value="replace" checked={mode === "replace"} onChange={() => setMode("replace")} />
-              Ersetzen <span className="hint">(komplette Liste durch das Backup ersetzen)</span>
-            </label>
-          </fieldset>
-          <button type="submit" className="btn" disabled={!file || busy}>{busy ? "Importiere …" : "⬆ Importieren"}</button>
-        </form>
-      </section>
+          <label className="group-row radio-row">
+            <input type="radio" name="import-mode" value="replace" checked={mode === "replace"} onChange={() => setMode("replace")} />
+            <span className="row-text">
+              Ersetzen
+              <span className="row-sub">Die komplette Liste wird durch das Backup ersetzt</span>
+            </span>
+            <IconCheck className="radio-check" />
+          </label>
+        </fieldset>
+        <div className="group-row">
+          <button type="submit" className="btn btn-primary btn-block" disabled={!file || busy}>{busy ? "Importiere …" : "Importieren"}</button>
+        </div>
+      </form>
 
       {message && (
         <p className={`notice ${message.kind === "ok" ? "notice-ok" : "notice-error"}`} role={message.kind === "error" ? "alert" : "status"}>
@@ -130,15 +148,17 @@ export default function MoreView({ store, onImported, gridSize, onGridSizeChange
         </p>
       )}
 
-      <section className="panel about">
-        <h2>Über</h2>
-        <p className="about-app"><span className="logo">filmio</span> – deine persönliche Filmliste.</p>
-        <p className="hint">Alle Daten bleiben lokal auf deinem Gerät. Kein Konto, kein Server.</p>
-        <div className="attribution">
-          <img src={tmdbLogo} alt="TMDB – The Movie Database" className="tmdb-logo" width={40} height={40} />
+      <h2 className="group-label">Über</h2>
+      <div className="group about">
+        <div className="group-row">
+          <p className="about-app"><span className="logo">filmio</span> – deine persönliche Filmliste.</p>
+          <p className="hint">Alle Daten bleiben lokal auf deinem Gerät. Kein Konto, kein Server.</p>
+        </div>
+        <div className="group-row attribution">
+          <img src={tmdbLogo} alt="TMDB – The Movie Database" className="tmdb-logo" width={32} height={32} />
           <p>This product uses the TMDB API but is not endorsed or certified by TMDB.</p>
         </div>
-      </section>
+      </div>
     </section>
   )
 }
