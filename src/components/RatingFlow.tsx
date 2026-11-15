@@ -3,6 +3,7 @@ import type { Answer, Film } from "../types"
 import { QUESTIONS, scoreFromAnswers } from "../lib/scoring"
 import { formatRating } from "../lib/format"
 import { starFillPercent } from "../lib/stars"
+import { backdropUrl, posterUrl } from "../lib/tmdb"
 import StarRating from "./StarRating"
 import { IconCheck, IconChevronLeft, IconMinus, IconX } from "./Icons"
 
@@ -12,7 +13,7 @@ export interface RatingResult {
 }
 
 interface Props {
-  film: Pick<Film, "title" | "answers">
+  film: Pick<Film, "title" | "answers" | "posterPath" | "backdropPath">
   onCancel: () => void
   /** Wird nach der Sterne-Enthüllung aufgerufen. */
   onSave: (result: RatingResult) => void
@@ -20,10 +21,11 @@ interface Props {
   onSaveWithoutRating: () => void
 }
 
+/** Wie eine Skala: Nein links, Ja rechts unter dem Daumen. */
 const OPTIONS: { value: Answer; label: string; icon: ReactNode }[] = [
-  { value: "ja", label: "Ja", icon: <IconCheck /> },
-  { value: "neutral", label: "Neutral", icon: <IconMinus /> },
   { value: "nein", label: "Nein", icon: <IconX /> },
+  { value: "neutral", label: "Neutral", icon: <IconMinus /> },
+  { value: "ja", label: "Ja", icon: <IconCheck /> },
 ]
 const LABEL: Record<Answer, string> = { ja: "Ja", neutral: "Neutral", nein: "Nein" }
 
@@ -31,6 +33,18 @@ const LABEL: Record<Answer, string> = { ja: "Ja", neutral: "Neutral", nein: "Nei
 const TAP_LOCK_MS = 300
 
 const prefersReducedMotion = () => window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false
+
+/** Unscharfes Szenenbild des Films als Hintergrund (Fallback: Poster, sonst schwarz). */
+function CineBackground({ film }: { film: Pick<Film, "posterPath" | "backdropPath"> }) {
+  const sources = [backdropUrl(film.backdropPath, "w780"), posterUrl(film.posterPath, "w185")].filter((s): s is string => !!s)
+  const [stage, setStage] = useState(0)
+  const src = sources[stage]
+  return (
+    <div className="cine" aria-hidden="true">
+      {src && <img src={src} alt="" onError={() => setStage((s) => s + 1)} />}
+    </div>
+  )
+}
 
 /**
  * Enthüllung: nur fünf leere Sterne, die sich je nach Bewertung langsam füllen,
@@ -142,6 +156,7 @@ export default function RatingFlow({ film, onCancel, onSave, onSaveWithoutRating
 
   return (
     <div className="overlay rating-flow" role="dialog" aria-modal="true" aria-label={`Bewertung: ${film.title}`}>
+      <CineBackground film={film} />
       {result ? (
         <StarReveal rating={result.rating} onDone={() => onSave(result)} />
       ) : (
@@ -158,17 +173,18 @@ export default function RatingFlow({ film, onCancel, onSave, onSaveWithoutRating
           <section className="question">
             <p className="question-count" aria-live="polite">Frage {step + 1} von {total}</p>
             <h2 className="question-text" ref={headingRef} tabIndex={-1}>{QUESTIONS[step]}</h2>
-            <div className="answer-buttons">
+            <div className="answer-row">
               {OPTIONS.map((o) => (
                 <button
                   key={o.value}
                   type="button"
                   className={`answer answer-${o.value}${answers[step] === o.value ? " answer-selected" : ""}`}
+                  aria-label={o.label}
+                  title={o.label}
                   aria-pressed={answers[step] === o.value}
                   onClick={() => answer(o.value)}
                 >
                   {o.icon}
-                  <span>{o.label}</span>
                 </button>
               ))}
             </div>
