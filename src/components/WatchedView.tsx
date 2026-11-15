@@ -14,6 +14,8 @@ const SORTS: { id: SortKey; label: string }[] = [
 ]
 
 const MIN_RATINGS = [0, 1, 2, 3, 3.5, 4, 4.5, 5]
+/** Spezialwert im Bewertungsfilter: nur Filme ohne Bewertung (z.B. importierte). */
+const UNRATED = -1
 
 interface Props {
   films: Film[]
@@ -39,7 +41,7 @@ export default function WatchedView({ films, onOpen }: Props) {
     const q = normalizeText(query.trim())
     const list = watched.filter((f) =>
       (!genre || f.genres.includes(genre)) &&
-      (f.rating ?? 0) >= minRating &&
+      (minRating === UNRATED ? f.rating === null : (f.rating ?? 0) >= minRating) &&
       (!q || normalizeText(f.title).includes(q) || normalizeText(f.note).includes(q)))
 
     const sorted = [...list]
@@ -63,7 +65,8 @@ export default function WatchedView({ films, onOpen }: Props) {
     return sorted
   }, [watched, sort, genre, minRating, query])
 
-  const filtered = genre !== "" || minRating > 0 || query.trim() !== ""
+  const filtered = genre !== "" || minRating !== 0 || query.trim() !== ""
+  const unratedCount = watched.filter((f) => f.rating === null).length
 
   function resetFilters() {
     setGenre("")
@@ -107,6 +110,7 @@ export default function WatchedView({ films, onOpen }: Props) {
                   {MIN_RATINGS.map((r) => (
                     <option key={r} value={r}>{r === 0 ? "Alle" : r === 5 ? "★ 5" : `ab ★ ${String(r).replace(".", ",")}`}</option>
                   ))}
+                  <option value={UNRATED}>Nicht bewertet ({unratedCount})</option>
                 </select>
               </label>
             </div>
@@ -130,6 +134,7 @@ export default function WatchedView({ films, onOpen }: Props) {
                   year={f.year}
                   posterPath={f.posterPath}
                   rating={f.rating}
+                  badge={f.rating === null ? "Noch nicht bewertet" : undefined}
                   onOpen={() => onOpen(f)}
                 />
               ))}

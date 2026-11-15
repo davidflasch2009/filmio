@@ -112,8 +112,9 @@ export default function App() {
       answers: result.answers,
       note: result.note,
       addedAt: existing?.addedAt ?? now,
-      // Beim ersten Markieren als gesehen = heute; Neu-Bewerten ändert das Datum nicht.
-      watchedAt: existing?.status === "watched" && existing.watchedAt ? existing.watchedAt : now,
+      // Beim ersten Markieren als gesehen = heute. Neu-Bewerten ändert das Datum nicht
+      // (auch nicht bei importierten Filmen ohne bekanntes Datum).
+      watchedAt: existing?.status === "watched" ? existing.watchedAt : now,
     }
     if (persist(() => addFilm(updated))) {
       setRating(null)
