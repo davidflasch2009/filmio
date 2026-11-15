@@ -68,6 +68,9 @@ export default function FilmDetail({
                 <span className="result-number">{formatRating(film.rating)} / 5</span>
               </div>
             )}
+            {watched && film.rating !== null && !film.answers && (
+              <p className="hint">Bewertung übernommen (ohne Fragebogen)</p>
+            )}
             {saved && (
               <p className="detail-dates">
                 Hinzugefügt am {formatDate(film.addedAt)}
@@ -92,7 +95,7 @@ export default function FilmDetail({
           {watched && (
             <>
               <button type="button" className="btn btn-primary" onClick={() => onRate(film)}>
-                {film.answers ? "Neu bewerten" : "Bewerten"}
+                {film.answers || film.rating !== null ? "Neu bewerten" : "Bewerten"}
               </button>
               <button type="button" className="btn" onClick={() => onMoveToWatchlist(film)}>Zurück auf Watchlist</button>
             </>
