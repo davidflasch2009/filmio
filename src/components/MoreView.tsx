@@ -1,16 +1,19 @@
 import { useRef, useState, type FormEvent } from "react"
 import type { Store } from "../types"
 import { exportJson, importJson, type ImportMode, type ImportResult } from "../lib/storage"
+import { GRID_SIZES, type GridSize } from "../lib/settings"
 import tmdbLogo from "../assets/tmdb-logo.svg"
 
 interface Props {
   store: Store
   onImported: (result: ImportResult) => void
+  gridSize: GridSize
+  onGridSizeChange: (size: GridSize) => void
 }
 
 type Message = { kind: "ok" | "error"; text: string }
 
-export default function MoreView({ store, onImported }: Props) {
+export default function MoreView({ store, onImported, gridSize, onGridSizeChange }: Props) {
   const fileRef = useRef<HTMLInputElement>(null)
   const [file, setFile] = useState<File | null>(null)
   const [mode, setMode] = useState<ImportMode>("merge")
@@ -64,6 +67,26 @@ export default function MoreView({ store, onImported }: Props) {
   return (
     <section className="view" aria-labelledby="more-heading">
       <h1 id="more-heading" className="view-title">Mehr</h1>
+
+      <section className="panel">
+        <h2>Darstellung</h2>
+        <fieldset className="segmented">
+          <legend>Größe der Filmkarten</legend>
+          {GRID_SIZES.map((g) => (
+            <label key={g.id} className={gridSize === g.id ? "segment segment-active" : "segment"}>
+              <input
+                type="radio"
+                name="grid-size"
+                value={g.id}
+                checked={gridSize === g.id}
+                onChange={() => onGridSizeChange(g.id)}
+              />
+              <span className="segment-label">{g.label}</span>
+              <span className="segment-hint">{g.hint}</span>
+            </label>
+          ))}
+        </fieldset>
+      </section>
 
       <section className="panel">
         <h2>Daten sichern</h2>

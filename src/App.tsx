@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react"
 import type { Film, Store } from "./types"
 import { addFilm, load, removeFilm, STORAGE_KEY, updateFilm, type ImportResult } from "./lib/storage"
 import { formatRating } from "./lib/format"
+import { loadSettings, saveSettings, type GridSize } from "./lib/settings"
 import TabBar, { type Tab } from "./components/TabBar"
 import SearchView from "./components/SearchView"
 import WatchedView from "./components/WatchedView"
@@ -34,6 +35,7 @@ function useOnline(): boolean {
 export default function App() {
   const [store, setStore] = useState<Store>(load)
   const [tab, setTab] = useState<Tab>("search")
+  const [settings, setSettings] = useState(loadSettings)
   /** Geöffnete Detailansicht: gespeicherter Film (per tmdbId) oder Vorschau eines Suchtreffers (draft). */
   const [detail, setDetail] = useState<{ tmdbId: number; draft: Film | null } | null>(null)
   /** Film, der gerade bewertet wird. */
@@ -152,6 +154,12 @@ export default function App() {
     persist(() => updateFilm(film.tmdbId, { fromNotes }))
   }
 
+  function changeGridSize(gridSize: GridSize) {
+    const next = { ...settings, gridSize }
+    setSettings(next)
+    saveSettings(next)
+  }
+
   function onImported(result: ImportResult) {
     setStore(result.store)
   }
@@ -166,7 +174,7 @@ export default function App() {
   const counts = { watched: watchedCount, watchlist: store.films.length - watchedCount }
 
   return (
-    <div className="app">
+    <div className="app" data-grid={settings.gridSize}>
       <header className="app-header">
         <span className="logo">filmio</span>
         {!online && <span className="offline-pill">offline</span>}
@@ -190,7 +198,7 @@ export default function App() {
           <WatchlistView films={store.films} onOpen={openSaved} onMarkWatched={setRating} />
         </div>
         <div hidden={tab !== "more"}>
-          <MoreView store={store} onImported={onImported} />
+          <MoreView store={store} onImported={onImported} gridSize={settings.gridSize} onGridSizeChange={changeGridSize} />
         </div>
       </main>
 

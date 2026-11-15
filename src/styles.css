@@ -36,6 +36,11 @@ h1, h2, h3 { line-height: 1.2; }
 /* ---------- Layout ---------- */
 
 .app { max-width: 960px; margin: 0 auto; }
+/* Deckt den Bereich der iPhone-Statusleiste ab, damit beim Scrollen nichts darunter durchläuft. */
+.app::before {
+  content: ""; position: fixed; top: 0; left: 0; right: 0; z-index: 50;
+  height: env(safe-area-inset-top); background: var(--bg); pointer-events: none;
+}
 
 .app-header {
   display: flex; align-items: center; justify-content: space-between;
@@ -124,8 +129,11 @@ textarea { resize: vertical; min-height: 90px; }
 
 /* ---------- Poster-Grid & Karten ---------- */
 
-.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 14px; }
-@media (max-width: 360px) { .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; } }
+/* Kartengröße (Mehr → Darstellung): s = klein, m = mittel (Standard), l = groß */
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 10px; }
+[data-grid="s"] .grid { grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); gap: 8px; }
+[data-grid="l"] .grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 14px; }
+@media (max-width: 330px) { [data-grid="l"] .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; } }
 
 .card { display: flex; flex-direction: column; background: var(--surface); border-radius: var(--radius); overflow: hidden; }
 .card-main {
@@ -134,13 +142,33 @@ textarea { resize: vertical; min-height: 90px; }
 }
 div.card-main { cursor: default; }
 .card-text { display: flex; flex-direction: column; gap: 3px; padding: 8px 10px 10px; }
-.card-title { font-weight: 600; font-size: 0.92rem; line-height: 1.25; overflow-wrap: anywhere; }
+.card-title { font-weight: 600; font-size: 0.92rem; line-height: 1.25; overflow-wrap: anywhere; -webkit-hyphens: auto; hyphens: auto; }
 .card-year { color: var(--muted); font-size: 0.8rem; }
 .card-badge {
   align-self: flex-start; font-size: 0.72rem; padding: 2px 7px; border-radius: 99px;
   background: var(--surface-2); color: var(--accent); border: 1px solid var(--border);
 }
 .card-actions { display: flex; flex-direction: column; gap: 6px; padding: 0 10px 10px; }
+
+/* Kleinere Karten: Text und Buttons mitverkleinern */
+[data-grid="m"] .card-text { padding: 6px 8px 8px; gap: 2px; }
+[data-grid="m"] .card-title { font-size: 0.8rem; }
+[data-grid="m"] .card-year { font-size: 0.72rem; }
+[data-grid="m"] .card .stars-sm { font-size: 0.72rem; }
+[data-grid="m"] .card-badge { font-size: 0.65rem; padding: 1px 6px; }
+[data-grid="m"] .card-actions { padding: 0 8px 8px; gap: 5px; }
+[data-grid="m"] .card-actions .btn-small { min-height: 34px; padding: 4px 6px; font-size: 0.75rem; }
+[data-grid="m"] .poster-empty { font-size: 2rem; }
+
+[data-grid="s"] .card { border-radius: 8px; }
+[data-grid="s"] .card-text { padding: 5px 6px 6px; gap: 1px; }
+[data-grid="s"] .card-title { font-size: 0.7rem; }
+[data-grid="s"] .card-year { font-size: 0.65rem; }
+[data-grid="s"] .card .stars-sm { font-size: 0.6rem; letter-spacing: 0; }
+[data-grid="s"] .card-badge { font-size: 0.58rem; padding: 1px 5px; }
+[data-grid="s"] .card-actions { padding: 0 6px 6px; gap: 4px; }
+[data-grid="s"] .card-actions .btn-small { min-height: 30px; padding: 3px 4px; font-size: 0.65rem; }
+[data-grid="s"] .poster-empty { font-size: 1.5rem; }
 
 .poster { display: block; width: 100%; aspect-ratio: 2 / 3; object-fit: cover; background: var(--surface-2); }
 .poster-empty { display: flex; align-items: center; justify-content: center; color: #555; font-size: 2.5rem; font-weight: 800; }
@@ -235,6 +263,19 @@ div.card-main { cursor: default; }
 .panel { background: var(--surface); border-radius: var(--radius); padding: 14px 16px; margin-bottom: 14px; }
 .panel h2 { font-size: 1.1rem; margin: 0 0 8px; }
 .panel input[type="file"] { font-size: 0.9rem; }
+
+.segmented { border: 0; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.segmented legend { font-size: 0.9rem; color: var(--muted); margin-bottom: 8px; padding: 0; }
+.segment {
+  display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 4px;
+  border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface-2); cursor: pointer;
+}
+.segment input { position: absolute; opacity: 0; pointer-events: none; }
+.segment:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+.segment-label { font-weight: 600; }
+.segment-hint { font-size: 0.72rem; color: var(--muted); }
+.segment-active { border-color: var(--accent); background: rgba(229, 184, 0, 0.15); }
+.segment-active .segment-label { color: var(--accent); }
 .about-app { margin: 0 0 4px; }
 .attribution { display: flex; align-items: center; gap: 12px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); }
 .attribution p { margin: 0; font-size: 0.8rem; color: var(--muted); }
