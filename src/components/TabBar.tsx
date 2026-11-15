@@ -1,7 +1,7 @@
 import type { ReactNode } from "react"
-import { IconBookmark, IconEye, IconMore, IconSearch } from "./Icons"
+import { IconBookmark, IconEye, IconHistory, IconMore, IconSearch } from "./Icons"
 
-export type Tab = "watched" | "watchlist" | "search" | "more"
+export type Tab = "watched" | "watchlist" | "earlier" | "search" | "more"
 
 interface Props {
   active: Tab
@@ -11,6 +11,7 @@ interface Props {
 const TABS: { id: Tab; label: string; icon: ReactNode }[] = [
   { id: "watched", label: "Gesehen", icon: <IconEye /> },
   { id: "watchlist", label: "Watchlist", icon: <IconBookmark /> },
+  { id: "earlier", label: "Früher", icon: <IconHistory /> },
   { id: "search", label: "Suche", icon: <IconSearch /> },
   { id: "more", label: "Mehr", icon: <IconMore /> },
 ]

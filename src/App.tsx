@@ -9,6 +9,7 @@ import TabBar, { type Tab } from "./components/TabBar"
 import SearchView from "./components/SearchView"
 import WatchedView from "./components/WatchedView"
 import WatchlistView from "./components/WatchlistView"
+import EarlierView from "./components/EarlierView"
 import MoreView from "./components/MoreView"
 import FilmDetail from "./components/FilmDetail"
 import RatingFlow, { type RatingResult } from "./components/RatingFlow"
@@ -32,7 +33,7 @@ export default function App() {
   /** Zufallsvorschlag aus der Watchlist geöffnet. */
   const [picking, setPicking] = useState(false)
   const online = useOnline()
-  const scrollPositions = useRef<Record<Tab, number>>({ watched: 0, watchlist: 0, search: 0, more: 0 })
+  const scrollPositions = useRef<Record<Tab, number>>({ watched: 0, watchlist: 0, earlier: 0, search: 0, more: 0 })
 
   // Änderungen aus anderen Browser-Tabs übernehmen.
   useEffect(() => {
@@ -157,12 +158,13 @@ export default function App() {
     if (persist(() => addFilm(updated))) {
       setRating(null)
       setDetail((d) => ({ tmdbId: film.tmdbId, draft: null, instant: d?.tmdbId !== film.tmdbId }))
-      notify("Als gesehen gespeichert")
+      notify("In „Früher gesehen“ gespeichert")
     }
   }
 
   function moveToWatchlist(film: Film) {
-    if (!window.confirm(`„${film.title}“ zurück auf die Watchlist schieben? Bewertung und Antworten werden entfernt.`)) return
+    if (film.rating !== null &&
+      !window.confirm(`„${film.title}“ zurück auf die Watchlist schieben? Bewertung und Antworten werden entfernt.`)) return
     if (persist(() => updateFilm(film.tmdbId, { status: "watchlist", rating: null, answers: null, watchedAt: null, fromNotes: false }))) {
       notify(`„${film.title}“ ist wieder auf der Watchlist.`)
     }
@@ -218,6 +220,9 @@ export default function App() {
             onRandom={() => setPicking(true)}
           />
         </div>
+        <div hidden={tab !== "earlier"}>
+          <EarlierView films={store.films} onOpen={openSaved} onFindFilms={() => changeTab("search")} />
+        </div>
         <div hidden={tab !== "search"}>
           <SearchView
             films={store.films}
@@ -247,6 +252,7 @@ export default function App() {
           onDelete={deleteFilm}
           onSaveNote={saveNote}
           onSetFromNotes={setFromNotes}
+          onSaveWithoutRating={saveWithoutRating}
         />
       )}
 

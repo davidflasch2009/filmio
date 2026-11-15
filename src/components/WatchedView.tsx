@@ -16,9 +16,6 @@ const SORTS: { value: SortKey; label: string }[] = [
   { value: "title", label: "Titel A–Z" },
 ]
 
-/** Spezialwert im Bewertungsfilter: nur Filme ohne Bewertung (z.B. importierte). */
-const UNRATED = -1
-
 interface Props {
   films: Film[]
   onOpen: (film: Film) => void
@@ -34,25 +31,24 @@ export default function WatchedView({ films, onOpen, onFindFilms }: Props) {
   const [minRating, setMinRating] = useState(0)
   const [query, setQuery] = useState("")
 
-  const watched = useMemo(() => films.filter((f) => f.status === "watched"), [films])
+  // Gesehene Filme ohne Bewertung stehen im Tab „Früher“.
+  const watched = useMemo(() => films.filter((f) => f.status === "watched" && f.rating !== null), [films])
   const genres = useMemo(
     () => [...new Set(watched.flatMap((f) => f.genres))].sort((a, b) => a.localeCompare(b, "de")),
     [watched],
   )
-  const unratedCount = watched.filter((f) => f.rating === null).length
 
   const minOptions = [
     { value: 0, label: "Alle Sterne" },
     { value: 5, label: "★ 5" },
     ...[4.5, 4, 3.5, 3, 2, 1].map((r) => ({ value: r, label: `ab ★ ${formatRating(r).replace(",0", "")}` })),
-    { value: UNRATED, label: `Ohne Bewertung (${unratedCount})` },
   ]
 
   const visible = useMemo(() => {
     const q = normalizeText(query.trim())
     const list = watched.filter((f) =>
       (!genre || f.genres.includes(genre)) &&
-      (minRating === UNRATED ? f.rating === null : (f.rating ?? 0) >= minRating) &&
+      (f.rating ?? 0) >= minRating &&
       (!q || normalizeText(f.title).includes(q) || normalizeText(f.note).includes(q)))
 
     const sorted = [...list]

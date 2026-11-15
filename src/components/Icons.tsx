@@ -45,6 +45,9 @@ export const IconTrash = (p: IconProps) => <Svg {...p}><path d="M4.5 7h15M9.5 7V
 export const IconDownload = (p: IconProps) => <Svg {...p}><path d="M12 4v11m-4.5-4.5L12 15l4.5-4.5M5 19.5h14" /></Svg>
 export const IconUpload = (p: IconProps) => <Svg {...p}><path d="M12 15.5V4.5M7.5 9 12 4.5 16.5 9M5 19.5h14" /></Svg>
 export const IconStar = (p: IconProps) => <Svg {...p}><path d={STAR_PATH} /></Svg>
+export const IconHistory = (p: IconProps) => (
+  <Svg {...p}><path d="M3.8 12a8.2 8.2 0 1 0 2.4-5.8" /><path d="M3.5 4.5v3.9h3.9" /><path d="M12 7.8v4.6l3 1.9" /></Svg>
+)
 export const IconDice = (p: IconProps) => (
   <Svg {...p}>
     <rect x="3.5" y="3.5" width="17" height="17" rx="4" />

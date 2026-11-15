@@ -134,7 +134,7 @@ export default function SearchView({ films, onAddToWatchlist, onRate, onOpenDeta
             const busy = busyId === r.id
             const badge = saved
               ? saved.status === "watched"
-                ? `✓ Gesehen${saved.rating !== null ? ` · ★ ${formatRating(saved.rating)}` : ""}`
+                ? saved.rating !== null ? `✓ Gesehen · ★ ${formatRating(saved.rating)}` : "Früher gesehen"
                 : "Auf der Watchlist"
               : busy ? "lädt …" : undefined
             return (

@@ -178,7 +178,7 @@ export default function RatingFlow({ film, onCancel, onSave, onSaveWithoutRating
               {answers[step] !== undefined && step < total - 1 ? (
                 <button type="button" className="text-btn" onClick={() => setStep(step + 1)}>Weiter</button>
               ) : step === 0 && (
-                <button type="button" className="text-btn skip-rating" onClick={onSaveWithoutRating}>Ohne Bewertung speichern</button>
+                <button type="button" className="text-btn skip-rating" onClick={onSaveWithoutRating}>Früher gesehen – ohne Bewertung</button>
               )}
             </div>
           </section>

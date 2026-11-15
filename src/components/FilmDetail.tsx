@@ -4,7 +4,7 @@ import { QUESTIONS } from "../lib/scoring"
 import { formatDate, formatRating, formatRuntime } from "../lib/format"
 import { backdropUrl, posterUrl } from "../lib/tmdb"
 import StarRating from "./StarRating"
-import { IconBookmark, IconCheck, IconChevronLeft, IconMinus, IconPlus, IconTrash, IconX } from "./Icons"
+import { IconBookmark, IconCheck, IconChevronLeft, IconHistory, IconMinus, IconPlus, IconTrash, IconX } from "./Icons"
 
 interface Props {
   film: Film
@@ -18,6 +18,8 @@ interface Props {
   onMoveToWatchlist: (film: Film) => void
   onDelete: (film: Film) => void
   onSaveNote: (film: Film, note: string) => void
+  /** Als „früher gesehen“ speichern, ohne Bewertung. */
+  onSaveWithoutRating: (film: Film) => void
   onSetFromNotes: (film: Film, fromNotes: boolean) => void
 }
 
@@ -49,7 +51,7 @@ function Hero({ film }: { film: Film }) {
 }
 
 export default function FilmDetail({
-  film, saved, instant = false, onClose, onRate, onAddToWatchlist, onMoveToWatchlist, onDelete, onSaveNote, onSetFromNotes,
+  film, saved, instant = false, onClose, onRate, onAddToWatchlist, onMoveToWatchlist, onDelete, onSaveNote, onSetFromNotes, onSaveWithoutRating,
 }: Props) {
   const [note, setNote] = useState(film.note)
   const [noteFor, setNoteFor] = useState(film.note)
@@ -61,6 +63,8 @@ export default function FilmDetail({
   }
 
   const watched = saved && film.status === "watched"
+  /** Gesehen, aber ohne Bewertung → Tab „Früher“. */
+  const earlier = watched && film.rating === null
   const meta = [film.year, formatRuntime(film.runtime)].filter(Boolean).join(" · ")
   const counts = film.answers?.reduce(
     (c, a) => ({ ...c, [a]: c[a] + 1 }), { ja: 0, neutral: 0, nein: 0 } as Record<Answer, number>)
@@ -71,7 +75,7 @@ export default function FilmDetail({
         <Hero film={film} />
         <button type="button" className="glass-btn back-btn" onClick={onClose} aria-label="Zurück"><IconChevronLeft /></button>
         <div className="hero-text">
-          {saved && <span className="hero-status">{film.status === "watched" ? "Gesehen" : "Watchlist"}</span>}
+          {saved && <span className="hero-status">{earlier ? "Früher gesehen" : film.status === "watched" ? "Gesehen" : "Watchlist"}</span>}
           <h2 className="detail-title">{film.title}</h2>
           {meta && <p className="detail-meta">{meta}</p>}
         </div>
@@ -86,7 +90,6 @@ export default function FilmDetail({
             <span className="detail-rating-num">{formatRating(film.rating)}</span>
           </div>
         )}
-        {watched && film.rating === null && <p className="detail-unrated">Ohne Bewertung</p>}
         {watched && film.rating !== null && (
           <label className="check">
             <input type="checkbox" checked={film.fromNotes} onChange={(e) => onSetFromNotes(film, e.target.checked)} />
@@ -98,19 +101,25 @@ export default function FilmDetail({
           {!saved && (
             <>
               <button type="button" className="btn btn-primary btn-block" onClick={() => onRate(film)}><IconCheck />Gesehen – jetzt bewerten</button>
-              <button type="button" className="btn btn-block" onClick={() => onAddToWatchlist(film)}><IconPlus />Auf die Watchlist</button>
+              <div className="btn-row">
+                <button type="button" className="btn" onClick={() => onAddToWatchlist(film)}><IconPlus />Watchlist</button>
+                <button type="button" className="btn" onClick={() => onSaveWithoutRating(film)}><IconHistory />Früher gesehen</button>
+              </div>
             </>
           )}
           {saved && film.status === "watchlist" && (
             <>
               <button type="button" className="btn btn-primary btn-block" onClick={() => onRate(film)}><IconCheck />Gesehen – jetzt bewerten</button>
-              <button type="button" className="btn btn-danger btn-block" onClick={() => onDelete(film)}><IconTrash />Löschen</button>
+              <div className="btn-row">
+                <button type="button" className="btn" onClick={() => onSaveWithoutRating(film)}><IconHistory />Früher gesehen</button>
+                <button type="button" className="btn btn-danger" onClick={() => onDelete(film)}><IconTrash />Löschen</button>
+              </div>
             </>
           )}
           {watched && (
             <>
               <button type="button" className="btn btn-primary btn-block" onClick={() => onRate(film)}>
-                {film.answers || film.rating !== null ? "Neu bewerten" : "Bewerten"}
+                {earlier ? "Jetzt bewerten" : "Neu bewerten"}
               </button>
               <div className="btn-row">
                 <button type="button" className="btn" onClick={() => onMoveToWatchlist(film)}><IconBookmark />Auf Watchlist</button>
