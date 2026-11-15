@@ -4,7 +4,7 @@ import { formatRating, normalizeText } from "../lib/format"
 import FilmCard from "./FilmCard"
 import FilterChip from "./FilterChip"
 import ViewHeader from "./ViewHeader"
-import { IconSearch } from "./Icons"
+import SearchField from "./SearchField"
 
 type SortKey = "rating-desc" | "rating-asc" | "added-desc" | "watched-desc" | "title"
 
@@ -85,17 +85,7 @@ export default function WatchedView({ films, onOpen, onFindFilms }: Props) {
       <ViewHeader id="watched-heading" title="Gesehen">
         {watched.length > 0 && (
           <>
-            <label className="search-field">
-              <IconSearch />
-              <input
-                type="search"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="In „Gesehen“ suchen"
-                aria-label="In gesehenen Filmen suchen"
-                autoComplete="off"
-              />
-            </label>
+            <SearchField value={query} onChange={setQuery} placeholder="In „Gesehen“ suchen" ariaLabel="In gesehenen Filmen suchen" />
             <div className="chips">
               <FilterChip id="watched-sort" label="Sortieren" options={SORTS} value={sort} onChange={setSort} active={sort !== "rating-desc"} />
               <FilterChip

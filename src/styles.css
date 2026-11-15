@@ -91,6 +91,15 @@ img { display: block; max-width: 100%; }
   color: var(--fg); font-size: 17px; /* ≥16px verhindert Zoom auf iOS */
 }
 .search-field input::placeholder { color: var(--muted); }
+.search-field input::-webkit-search-cancel-button, .search-field input::-webkit-search-decoration { -webkit-appearance: none; appearance: none; display: none; }
+.search-field { cursor: text; }
+.search-clear {
+  display: grid; place-items: center; flex: none; width: 30px; height: 30px; margin-right: -6px;
+  padding: 0; border: 0; background: none; cursor: pointer;
+}
+.search-clear svg { width: 18px; height: 18px; }
+.search-clear circle { fill: var(--muted); }
+.search-clear path { fill: none; stroke: var(--surface); stroke-width: 2; stroke-linecap: round; }
 .search-field:focus-within { box-shadow: 0 0 0 2px var(--accent-soft); }
 
 .chips {

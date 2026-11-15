@@ -5,7 +5,8 @@ import { newFilm } from "../lib/storage"
 import { formatRating } from "../lib/format"
 import FilmCard from "./FilmCard"
 import ViewHeader from "./ViewHeader"
-import { IconCheck, IconPlus, IconSearch } from "./Icons"
+import { IconCheck, IconPlus } from "./Icons"
+import SearchField from "./SearchField"
 import { useOnline } from "../hooks/useOnline"
 
 interface Props {
@@ -96,19 +97,7 @@ export default function SearchView({ films, onAddToWatchlist, onRate, onOpenDeta
     <section className="view" aria-labelledby="search-heading">
       <ViewHeader id="search-heading" title="Suche">
         <form role="search" onSubmit={onSubmit}>
-          <label className="search-field">
-            <IconSearch />
-            <input
-              type="search"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Filmtitel"
-              aria-label="Film bei TMDB suchen"
-              enterKeyHint="search"
-              autoComplete="off"
-              disabled={!hasToken}
-            />
-          </label>
+          <SearchField value={query} onChange={setQuery} placeholder="Filmtitel" ariaLabel="Film bei TMDB suchen" disabled={!hasToken} />
         </form>
       </ViewHeader>
 

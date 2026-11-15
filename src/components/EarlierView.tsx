@@ -3,7 +3,7 @@ import type { Film } from "../types"
 import { normalizeText } from "../lib/format"
 import FilmCard from "./FilmCard"
 import ViewHeader from "./ViewHeader"
-import { IconSearch } from "./Icons"
+import SearchField from "./SearchField"
 
 interface Props {
   films: Film[]
@@ -28,17 +28,7 @@ export default function EarlierView({ films, onOpen, onFindFilms }: Props) {
     <section className="view" aria-labelledby="earlier-heading">
       <ViewHeader id="earlier-heading" title="Früher gesehen">
         {earlier.length > 0 && (
-          <label className="search-field">
-            <IconSearch />
-            <input
-              type="search"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="In „Früher gesehen“ suchen"
-              aria-label="In früher gesehenen Filmen suchen"
-              autoComplete="off"
-            />
-          </label>
+          <SearchField value={query} onChange={setQuery} placeholder="In „Früher gesehen“ suchen" ariaLabel="In früher gesehenen Filmen suchen" />
         )}
       </ViewHeader>
 
