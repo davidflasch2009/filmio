@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>filmio – TMDB Token-Test</title>
+<style>
+  :root { color-scheme: dark; }
+  body { font-family: system-ui, -apple-system, sans-serif; background:#111; color:#eee; margin:0; padding:24px; max-width:760px; margin-inline:auto; }
+  h1 { font-size:1.3rem; margin:0 0 4px; }
+  p.sub { color:#aaa; font-size:.9rem; margin-top:4px; }
+  label { display:block; margin:16px 0 6px; font-size:.9rem; color:#ccc; }
+  input { width:100%; box-sizing:border-box; padding:11px; border-radius:8px; border:1px solid #333; background:#1b1b1b; color:#eee; font-size:1rem; }
+  .row { display:flex; gap:8px; }
+  .row input { flex:1; }
+  button { padding:11px 18px; border:0; border-radius:8px; background:#e5b800; color:#111; font-weight:700; font-size:1rem; cursor:pointer; }
+  button:disabled { opacity:.5; cursor:default; }
+  #status { margin:18px 0 0; padding:12px 14px; border-radius:8px; font-size:.95rem; white-space:pre-wrap; display:none; }
+  #status.show { display:block; }
+  .ok { background:#10361a; border:1px solid #1f7a37; }
+  .err { background:#3a1414; border:1px solid #a23; }
+  .neutral { background:#222; border:1px solid #444; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(110px,1fr)); gap:12px; margin-top:16px; }
+  .card { background:#1b1b1b; border-radius:8px; overflow:hidden; }
+  .card img { width:100%; display:block; aspect-ratio:2/3; object-fit:cover; background:#222; }
+  .card .t { padding:6px 8px; font-size:.78rem; line-height:1.25; color:#ddd; }
+  .hint { color:#888; font-size:.8rem; margin-top:26px; line-height:1.5; }
+  code { background:#000; padding:1px 5px; border-radius:4px; }
+</style>
+</head>
+<body>
+  <h1>🎬 filmio – TMDB Token-Test</h1>
+  <p class="sub">Prüft deinen <b>v4 Read Access Token</b> – exakt so, wie filmio es später nutzt (Suche + Poster, direkt aus dem Browser). Dein Token bleibt in diesem Tab und geht nur an TMDB, nicht an mich.</p>
+
+  <label for="token">TMDB v4 Read Access Token</label>
+  <input id="token" type="password" placeholder="eyJhbGciOi… (langer Token)" autocomplete="off" spellcheck="false">
+
+  <label for="q">Testsuche</label>
+  <div class="row">
+    <input id="q" type="text" value="Fight Club" spellcheck="false">
+    <button id="go">Testen</button>
+  </div>
+
+  <div id="status"></div>
+  <div id="grid" class="grid"></div>
+
+  <p class="hint">
+    Fehler <code>401</code> → Token falsch oder E-Mail bei TMDB noch nicht verifiziert.<br>
+    Poster erscheinen → alles läuft, genau dieser Token kommt später als GitHub-Secret rein.
+  </p>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const statusEl = $('#status'), grid = $('#grid'), btn = $('#go');
+
+function show(cls, msg) { statusEl.className = 'show ' + cls; statusEl.textContent = msg; }
+
+async function run() {
+  const token = $('#token').value.trim();
+  const q = $('#q').value.trim() || 'Fight Club';
+  grid.innerHTML = '';
+  if (!token) { show('err', '⚠️ Bitte zuerst deinen Token einfügen.'); return; }
+  show('neutral', '… teste …');
+  btn.disabled = true;
+  try {
+    const url = 'https://api.themoviedb.org/3/search/movie?query=' +
+      encodeURIComponent(q) + '&language=de-DE&include_adult=false';
+    const res = await fetch(url, { headers: { Authorization: 'Bearer ' + token, accept: 'application/json' } });
+    if (!res.ok) {
+      show('err', '❌ TMDB-Fehler ' + res.status +
+        (res.status === 401 ? ' – Token ungültig oder E-Mail nicht verifiziert.' : ''));
+      return;
+    }
+    const data = await res.json();
+    const results = data.results || [];
+    if (!results.length) { show('ok', '✅ Token gültig – aber keine Treffer für „' + q + '". Probier einen anderen Titel.'); return; }
+    show('ok', '✅ Alles läuft! Token gültig · ' + (data.total_results || results.length) +
+      ' Treffer · CORS ok · Poster laden unten. Fertig für filmio.');
+    for (const m of results.slice(0, 12)) {
+      const card = document.createElement('div');
+      card.className = 'card';
+      const img = document.createElement('img');
+      img.loading = 'lazy'; img.alt = m.title || '';
+      if (m.poster_path) img.src = 'https://image.tmdb.org/t/p/w185' + m.poster_path;
+      const t = document.createElement('div');
+      t.className = 't';
+      const year = (m.release_date || '').slice(0, 4);
+      t.textContent = (m.title || '?') + (year ? ' (' + year + ')' : '');
+      card.appendChild(img); card.appendChild(t);
+      grid.appendChild(card);
+    }
+  } catch (e) {
+    show('err', '❌ Netzwerkfehler: ' + e.message + '\n(Offline? Token leer? Datei wirklich im Browser geöffnet?)');
+  } finally {
+    btn.disabled = false;
+  }
+}
+btn.addEventListener('click', run);
+$('#token').addEventListener('keydown', (e) => { if (e.key === 'Enter') run(); });
+$('#q').addEventListener('keydown', (e) => { if (e.key === 'Enter') run(); });
+</script>
+</body>
+</html>
