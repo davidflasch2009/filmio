@@ -73,6 +73,9 @@ img { display: block; max-width: 100%; }
 .view-title-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .view-title { font: 700 34px/1.05 var(--font-display); letter-spacing: -0.025em; }
 .view-sub { margin-top: -6px; color: var(--muted); font-size: 15px; }
+.view-actions { display: flex; align-items: center; gap: 10px; flex: none; }
+.accent-btn { width: 40px; height: 40px; background: var(--surface); color: var(--accent); }
+.accent-btn .ic { width: 22px; height: 22px; }
 .offline-pill {
   flex: none; font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 99px;
   background: var(--surface-2); color: var(--muted);
@@ -327,6 +330,7 @@ div.card-main { cursor: default; }
 .question-nav { margin-top: auto; padding-top: 18px; display: flex; justify-content: space-between; }
 .question-nav .text-btn { color: var(--muted); }
 .question-nav .text-btn:last-child:not(:first-child) { color: var(--accent); }
+.question-nav .skip-rating { color: var(--muted) !important; font-weight: 500; }
 
 /* Enthüllung: nur fünf Sterne, dann die Zahl */
 .reveal {
@@ -338,6 +342,30 @@ div.card-main { cursor: default; }
   opacity: 0; transform: translateY(8px); transition: opacity .55s ease, transform .55s ease;
 }
 .reveal-number.show { opacity: 1; transform: none; }
+
+/* Zufallsvorschlag */
+.pick {
+  z-index: 25; display: flex; align-items: center; justify-content: center;
+  padding: max(20px, env(safe-area-inset-top)) var(--gutter-r) max(20px, env(safe-area-inset-bottom)) var(--gutter-l);
+  background: rgba(0, 0, 0, 0.6); -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px);
+  animation: fade-in .25s ease both;
+}
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+.pick-card {
+  position: relative; width: 100%; max-width: 340px; padding: 26px 20px 20px; border-radius: 24px;
+  background: var(--surface); box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6); text-align: center;
+  animation: fade-up .3s ease both;
+}
+.pick-close { position: absolute; top: 12px; right: 12px; width: 32px; height: 32px; background: var(--surface-2); }
+.pick-close .ic { width: 18px; height: 18px; }
+.pick-poster { width: 58%; margin: 0 auto 16px; }
+.pick-poster .poster { box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6); }
+.pick-poster.landed { animation: pick-land .35s cubic-bezier(.2, .9, .3, 1.3) both; }
+@keyframes pick-land { from { transform: scale(0.94); } to { transform: none; } }
+.pick-title { font: 700 22px/1.2 var(--font-display); letter-spacing: -0.01em; text-wrap: balance; min-height: 1.2em; }
+.pick-title.rolling { color: var(--muted); }
+.pick-meta { margin-top: 6px; color: var(--muted); font-size: 14px; }
+.pick-actions { display: grid; gap: 10px; margin-top: 20px; }
 
 /* ---------- Mehr: Gruppen wie in den iOS-Einstellungen ---------- */
 
@@ -418,7 +446,7 @@ div.card-main { cursor: default; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .detail-enter, .rating-flow, .toast { animation: none !important; }
+  .detail-enter, .rating-flow, .toast, .pick, .pick-card, .pick-poster.landed { animation: none !important; }
   .toast { transform: translateX(-50%); }
   .reveal-number, .rf-progress i, .poster, .btn, .answer { transition: none !important; }
 }

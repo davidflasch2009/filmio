@@ -45,3 +45,13 @@ export const IconTrash = (p: IconProps) => <Svg {...p}><path d="M4.5 7h15M9.5 7V
 export const IconDownload = (p: IconProps) => <Svg {...p}><path d="M12 4v11m-4.5-4.5L12 15l4.5-4.5M5 19.5h14" /></Svg>
 export const IconUpload = (p: IconProps) => <Svg {...p}><path d="M12 15.5V4.5M7.5 9 12 4.5 16.5 9M5 19.5h14" /></Svg>
 export const IconStar = (p: IconProps) => <Svg {...p}><path d={STAR_PATH} /></Svg>
+export const IconDice = (p: IconProps) => (
+  <Svg {...p}>
+    <rect x="3.5" y="3.5" width="17" height="17" rx="4" />
+    <circle cx="8.5" cy="8.5" r="1.4" fill="currentColor" stroke="none" />
+    <circle cx="15.5" cy="8.5" r="1.4" fill="currentColor" stroke="none" />
+    <circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none" />
+    <circle cx="8.5" cy="15.5" r="1.4" fill="currentColor" stroke="none" />
+    <circle cx="15.5" cy="15.5" r="1.4" fill="currentColor" stroke="none" />
+  </Svg>
+)

@@ -94,7 +94,7 @@ export default function SearchView({ films, onAddToWatchlist, onRate, onOpenDeta
 
   return (
     <section className="view" aria-labelledby="search-heading">
-      <ViewHeader id="search-heading" title="Suche" subtitle="Filme bei TMDB finden">
+      <ViewHeader id="search-heading" title="Suche">
         <form role="search" onSubmit={onSubmit}>
           <label className="search-field">
             <IconSearch />
@@ -164,9 +164,6 @@ export default function SearchView({ films, onAddToWatchlist, onRate, onOpenDeta
         </div>
       )}
 
-      {!results && !loading && !error && hasToken && online && (
-        <p className="empty">Suche einen Film und füge ihn zur Watchlist hinzu oder bewerte ihn direkt.</p>
-      )}
     </section>
   )
 }

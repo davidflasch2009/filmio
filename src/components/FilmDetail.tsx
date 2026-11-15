@@ -86,7 +86,7 @@ export default function FilmDetail({
             <span className="detail-rating-num">{formatRating(film.rating)}</span>
           </div>
         )}
-        {watched && film.rating === null && <p className="detail-unrated">Noch nicht bewertet</p>}
+        {watched && film.rating === null && <p className="detail-unrated">Ohne Bewertung</p>}
         {watched && film.rating !== null && (
           <label className="check">
             <input type="checkbox" checked={film.fromNotes} onChange={(e) => onSetFromNotes(film, e.target.checked)} />

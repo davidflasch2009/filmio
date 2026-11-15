@@ -39,15 +39,13 @@ export default function WatchedView({ films, onOpen, onFindFilms }: Props) {
     () => [...new Set(watched.flatMap((f) => f.genres))].sort((a, b) => a.localeCompare(b, "de")),
     [watched],
   )
-  const rated = watched.filter((f) => f.rating !== null)
-  const average = rated.length ? rated.reduce((s, f) => s + (f.rating ?? 0), 0) / rated.length : null
-  const unratedCount = watched.length - rated.length
+  const unratedCount = watched.filter((f) => f.rating === null).length
 
   const minOptions = [
     { value: 0, label: "Alle Sterne" },
     { value: 5, label: "★ 5" },
     ...[4.5, 4, 3.5, 3, 2, 1].map((r) => ({ value: r, label: `ab ★ ${formatRating(r).replace(",0", "")}` })),
-    { value: UNRATED, label: `Nicht bewertet (${unratedCount})` },
+    { value: UNRATED, label: `Ohne Bewertung (${unratedCount})` },
   ]
 
   const visible = useMemo(() => {
@@ -86,13 +84,9 @@ export default function WatchedView({ films, onOpen, onFindFilms }: Props) {
     setQuery("")
   }
 
-  const subtitle = watched.length === 0
-    ? undefined
-    : `${watched.length} ${watched.length === 1 ? "Film" : "Filme"}${average !== null ? ` · im Schnitt ${formatRating(Math.round(average * 10) / 10)} ★` : ""}`
-
   return (
     <section className="view" aria-labelledby="watched-heading">
-      <ViewHeader id="watched-heading" title="Gesehen" subtitle={subtitle}>
+      <ViewHeader id="watched-heading" title="Gesehen">
         {watched.length > 0 && (
           <>
             <label className="search-field">
@@ -147,7 +141,6 @@ export default function WatchedView({ films, onOpen, onFindFilms }: Props) {
                   year={f.year}
                   posterPath={f.posterPath}
                   rating={f.rating}
-                  badge={f.rating === null ? "Noch nicht bewertet" : undefined}
                   onOpen={() => onOpen(f)}
                 />
               ))}

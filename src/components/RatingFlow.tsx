@@ -16,6 +16,8 @@ interface Props {
   onCancel: () => void
   /** Wird nach der Sterne-Enthüllung aufgerufen. */
   onSave: (result: RatingResult) => void
+  /** Als gesehen speichern, ohne zu bewerten (z.B. weil der Film zu lange her ist). */
+  onSaveWithoutRating: () => void
 }
 
 const OPTIONS: { value: Answer; label: string; icon: ReactNode }[] = [
@@ -99,7 +101,7 @@ function StarReveal({ rating, onDone }: { rating: number; onDone: () => void }) 
 }
 
 /** Fragebogen: eine Frage pro Screen, Auto-Weiter, danach die Sterne-Enthüllung. */
-export default function RatingFlow({ film, onCancel, onSave }: Props) {
+export default function RatingFlow({ film, onCancel, onSave, onSaveWithoutRating }: Props) {
   const total = QUESTIONS.length
   const [step, setStep] = useState(0)
   const [answers, setAnswers] = useState<(Answer | undefined)[]>(() => Array(total).fill(undefined))
@@ -173,8 +175,10 @@ export default function RatingFlow({ film, onCancel, onSave }: Props) {
             {previous && <p className="hint question-previous">Letztes Mal: {LABEL[previous[step]]}</p>}
             <div className="question-nav">
               <button type="button" className="text-btn" onClick={back} disabled={step === 0}><IconChevronLeft />Zurück</button>
-              {answers[step] !== undefined && step < total - 1 && (
+              {answers[step] !== undefined && step < total - 1 ? (
                 <button type="button" className="text-btn" onClick={() => setStep(step + 1)}>Weiter</button>
+              ) : step === 0 && (
+                <button type="button" className="text-btn skip-rating" onClick={onSaveWithoutRating}>Ohne Bewertung speichern</button>
               )}
             </div>
           </section>

@@ -12,6 +12,7 @@ import WatchlistView from "./components/WatchlistView"
 import MoreView from "./components/MoreView"
 import FilmDetail from "./components/FilmDetail"
 import RatingFlow, { type RatingResult } from "./components/RatingFlow"
+import RandomPick from "./components/RandomPick"
 
 interface Toast {
   id: number
@@ -28,6 +29,8 @@ export default function App() {
   /** Film, der gerade bewertet wird. */
   const [rating, setRating] = useState<Film | null>(null)
   const [toast, setToast] = useState<Toast | null>(null)
+  /** Zufallsvorschlag aus der Watchlist geöffnet. */
+  const [picking, setPicking] = useState(false)
   const online = useOnline()
   const scrollPositions = useRef<Record<Tab, number>>({ watched: 0, watchlist: 0, search: 0, more: 0 })
 
@@ -68,7 +71,7 @@ export default function App() {
     return () => clearTimeout(t)
   }, [toast])
 
-  const overlayOpen = detail !== null || rating !== null
+  const overlayOpen = detail !== null || rating !== null || picking
   useEffect(() => {
     document.body.classList.toggle("no-scroll", overlayOpen)
   }, [overlayOpen])
@@ -138,6 +141,26 @@ export default function App() {
     }
   }
 
+  /** Als gesehen speichern, ohne Bewertung (z.B. weil der Film zu lange her ist). */
+  function saveWithoutRating(film: Film) {
+    const existing = findSaved(film.tmdbId)
+    const updated: Film = {
+      ...(existing ?? film),
+      status: "watched",
+      rating: null,
+      answers: null,
+      fromNotes: false,
+      addedAt: existing?.addedAt ?? new Date().toISOString(),
+      // Wann genau, ist unbekannt – kein erfundenes Datum.
+      watchedAt: existing?.status === "watched" ? existing.watchedAt : null,
+    }
+    if (persist(() => addFilm(updated))) {
+      setRating(null)
+      setDetail((d) => ({ tmdbId: film.tmdbId, draft: null, instant: d?.tmdbId !== film.tmdbId }))
+      notify("Als gesehen gespeichert")
+    }
+  }
+
   function moveToWatchlist(film: Film) {
     if (!window.confirm(`„${film.title}“ zurück auf die Watchlist schieben? Bewertung und Antworten werden entfernt.`)) return
     if (persist(() => updateFilm(film.tmdbId, { status: "watchlist", rating: null, answers: null, watchedAt: null, fromNotes: false }))) {
@@ -187,7 +210,13 @@ export default function App() {
           <WatchedView films={store.films} onOpen={openSaved} onFindFilms={() => changeTab("search")} />
         </div>
         <div hidden={tab !== "watchlist"}>
-          <WatchlistView films={store.films} onOpen={openSaved} onMarkWatched={setRating} onFindFilms={() => changeTab("search")} />
+          <WatchlistView
+            films={store.films}
+            onOpen={openSaved}
+            onMarkWatched={setRating}
+            onFindFilms={() => changeTab("search")}
+            onRandom={() => setPicking(true)}
+          />
         </div>
         <div hidden={tab !== "search"}>
           <SearchView
@@ -227,6 +256,15 @@ export default function App() {
           film={findSaved(rating.tmdbId) ?? rating}
           onCancel={() => setRating(null)}
           onSave={(result) => saveRating(rating, result)}
+          onSaveWithoutRating={() => saveWithoutRating(rating)}
+        />
+      )}
+
+      {picking && (
+        <RandomPick
+          films={store.films.filter((f) => f.status === "watchlist")}
+          onClose={() => setPicking(false)}
+          onOpen={(film) => { setPicking(false); openSaved(film) }}
         />
       )}
 

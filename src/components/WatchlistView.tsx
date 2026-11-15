@@ -2,16 +2,17 @@ import { useMemo } from "react"
 import type { Film } from "../types"
 import FilmCard from "./FilmCard"
 import ViewHeader from "./ViewHeader"
-import { IconCheck } from "./Icons"
+import { IconCheck, IconDice } from "./Icons"
 
 interface Props {
   films: Film[]
   onOpen: (film: Film) => void
   onMarkWatched: (film: Film) => void
   onFindFilms: () => void
+  onRandom: () => void
 }
 
-export default function WatchlistView({ films, onOpen, onMarkWatched, onFindFilms }: Props) {
+export default function WatchlistView({ films, onOpen, onMarkWatched, onFindFilms, onRandom }: Props) {
   // Neueste zuerst.
   const list = useMemo(
     () => films
@@ -25,7 +26,11 @@ export default function WatchlistView({ films, onOpen, onMarkWatched, onFindFilm
       <ViewHeader
         id="watchlist-heading"
         title="Watchlist"
-        subtitle={list.length ? `${list.length} ${list.length === 1 ? "Film" : "Filme"}, die du sehen willst` : undefined}
+        action={list.length > 0 && (
+          <button type="button" className="round-btn accent-btn" onClick={onRandom} aria-label="Zufälligen Film vorschlagen" title="Zufälliger Film">
+            <IconDice />
+          </button>
+        )}
       />
 
       {list.length === 0 ? (
