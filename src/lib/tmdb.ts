@@ -1,4 +1,5 @@
 import type { FilmInfo } from "../types"
+import type { Region } from "./settings"
 
 const BASE = "https://api.themoviedb.org/3"
 const IMG = "https://image.tmdb.org/t/p"
@@ -11,16 +12,19 @@ const headers = {
 /** false, wenn beim Build kein VITE_TMDB_TOKEN gesetzt war. */
 export const hasToken = TOKEN.trim() !== ""
 
-export interface TmdbSearchResult {
+/** Eintrag in Suchtreffern und Listen (Trends, Empfehlungen, Filmreihen …). */
+export interface TmdbListItem {
   id: number
   title: string
   original_title?: string
   release_date?: string
   overview?: string
   poster_path: string | null
+  backdrop_path?: string | null
   genre_ids?: number[]
   vote_average?: number
 }
+export type TmdbSearchResult = TmdbListItem
 
 export interface TmdbMovieDetails {
   id: number
@@ -32,7 +36,19 @@ export interface TmdbMovieDetails {
   backdrop_path?: string | null
   genres?: { id: number; name: string }[]
   runtime?: number | null
+  tagline?: string | null
+  belongs_to_collection?: { id: number; name: string } | null
+  credits?: {
+    cast?: { id: number; name: string; character?: string; profile_path: string | null; order?: number }[]
+    crew?: { id: number; name: string; job?: string }[]
+  }
+  videos?: { results?: { key: string; site: string; type: string; iso_639_1?: string; official?: boolean }[] }
+  "watch/providers"?: { results?: Record<string, TmdbWatchRegion | undefined> }
+  recommendations?: { results?: TmdbListItem[] }
 }
+
+interface TmdbProvider { provider_id: number; provider_name: string; logo_path: string | null; display_priority?: number }
+interface TmdbWatchRegion { link?: string; flatrate?: TmdbProvider[]; free?: TmdbProvider[]; ads?: TmdbProvider[]; rent?: TmdbProvider[]; buy?: TmdbProvider[] }
 
 export class TmdbError extends Error {
   status: number | null
@@ -85,6 +101,11 @@ export function backdropUrl(path: string | null | undefined, size: "w780" | "w12
   return path ? `${IMG}/${size}${path}` : null
 }
 
+/** Porträts (Besetzung) und Anbieter-Logos. */
+export function smallImageUrl(path: string | null, size: "w92" | "w185" = "w185") {
+  return path ? `${IMG}/${size}${path}` : null
+}
+
 /** Nur das Szenenbild eines Films (zum Nachladen für ältere Einträge). null = TMDB hat keins. */
 export async function fetchBackdropPath(id: number): Promise<string | null> {
   try {
@@ -102,37 +123,220 @@ export function yearFromDate(date: string | undefined | null): number | null {
   return Number.isFinite(y) && y > 0 ? y : null
 }
 
-const infoCache = new Map<number, FilmInfo>()
+// ---------------------------------------------------------------------------
+// Film komplett: gecachte Felder + Zusatzinfos für die Detailseite
+// ---------------------------------------------------------------------------
+
+export interface CastMember {
+  id: number
+  name: string
+  character: string
+  profilePath: string | null
+}
+
+export interface Provider {
+  id: number
+  name: string
+  logoPath: string | null
+}
+
+export interface WatchInfo {
+  /** Seite mit allen Anbietern (TMDB/JustWatch). */
+  link: string | null
+  /** Im Abo, kostenlos oder mit Werbung. */
+  stream: Provider[]
+  /** Leihen oder kaufen (ohne die Anbieter aus `stream`). */
+  rentBuy: Provider[]
+}
+
+export interface MovieExtras {
+  tagline: string
+  directors: string[]
+  cast: CastMember[]
+  /** YouTube-Link zum Trailer (deutsch bevorzugt). */
+  trailerUrl: string | null
+  watch: Record<Region, WatchInfo>
+  collection: { id: number; name: string } | null
+  recommendations: TmdbListItem[]
+}
+
+export interface MovieFull {
+  info: FilmInfo
+  extras: MovieExtras
+}
+
+const REGION_CODES: Region[] = ["DE", "AT", "CH"]
+
+function uniqueProviders(lists: (TmdbProvider[] | undefined)[], exclude: Set<number> = new Set()): Provider[] {
+  const seen = new Set(exclude)
+  const out: Provider[] = []
+  for (const p of lists.flatMap((l) => l ?? []).sort((a, b) => (a.display_priority ?? 99) - (b.display_priority ?? 99))) {
+    // „Netflix Standard with Ads“ u.ä. sind derselbe Dienst wie das Hauptangebot.
+    if (seen.has(p.provider_id) || / with ads$/i.test(p.provider_name)) continue
+    seen.add(p.provider_id)
+    out.push({ id: p.provider_id, name: p.provider_name, logoPath: p.logo_path ?? null })
+  }
+  return out
+}
+
+function parseWatch(region: TmdbWatchRegion | undefined): WatchInfo {
+  const stream = uniqueProviders([region?.flatrate, region?.free, region?.ads])
+  const rentBuy = uniqueProviders([region?.rent, region?.buy], new Set(stream.map((p) => p.id)))
+  return { link: region?.link ?? null, stream, rentBuy }
+}
+
+function pickTrailer(videos: NonNullable<TmdbMovieDetails["videos"]>["results"]): string | null {
+  const trailers = (videos ?? []).filter((v) => v.site === "YouTube" && (v.type === "Trailer" || v.type === "Teaser"))
+  const score = (v: (typeof trailers)[number]) =>
+    (v.type === "Trailer" ? 4 : 0) + (v.iso_639_1 === "de" ? 2 : 0) + (v.official ? 1 : 0)
+  const best = trailers.sort((a, b) => score(b) - score(a))[0]
+  return best ? `https://www.youtube.com/watch?v=${encodeURIComponent(best.key)}` : null
+}
+
+const fullCache = new Map<number, MovieFull>()
+const fullPending = new Map<number, Promise<MovieFull>>()
+
+/** Bereits geladene Zusatzinfos (ohne Netz), sonst null. */
+export function peekMovieFull(id: number): MovieFull | null {
+  return fullCache.get(id) ?? null
+}
 
 /**
- * Holt alle Felder, die beim Hinzufügen im Film gecached werden.
- * Ist die deutsche Overview leer, wird die englische nachgeladen.
+ * Lädt einen Film komplett in einer Anfrage: die Felder, die gespeichert werden, plus Besetzung, Regie,
+ * Trailer, Streaming-Anbieter, Filmreihe und Empfehlungen. Ist die deutsche Handlung leer, wird die englische nachgeladen.
  */
-export async function loadFilmInfo(id: number): Promise<FilmInfo> {
-  const cached = infoCache.get(id)
-  if (cached) return cached
+export function loadMovieFull(id: number): Promise<MovieFull> {
+  const cached = fullCache.get(id)
+  if (cached) return Promise.resolve(cached)
+  const pending = fullPending.get(id)
+  if (pending) return pending
 
-  const de = await getMovie(id, "de-DE")
-  let overview = (de.overview ?? "").trim()
-  if (!overview) {
-    try {
-      const en = await getMovie(id, "en-US")
-      overview = (en.overview ?? "").trim()
-    } catch {
-      // Englischer Fallback ist optional.
+  const promise = (async () => {
+    const de = await request<TmdbMovieDetails>(
+      `${BASE}/movie/${id}?language=de-DE&append_to_response=credits,videos,watch/providers,recommendations&include_video_language=de,en`)
+    let overview = (de.overview ?? "").trim()
+    if (!overview) {
+      try {
+        overview = ((await getMovie(id, "en-US")).overview ?? "").trim()
+      } catch {
+        // Englischer Fallback ist optional.
+      }
     }
-  }
+    const info: FilmInfo = {
+      tmdbId: de.id,
+      title: de.title || de.original_title || "Unbekannter Titel",
+      year: yearFromDate(de.release_date),
+      posterPath: de.poster_path ?? null,
+      backdropPath: de.backdrop_path ?? null,
+      genres: (de.genres ?? []).map((g) => g.name),
+      overview,
+      runtime: de.runtime ? de.runtime : null,
+    }
+    const regions = de["watch/providers"]?.results ?? {}
+    const extras: MovieExtras = {
+      tagline: (de.tagline ?? "").trim(),
+      directors: (de.credits?.crew ?? []).filter((c) => c.job === "Director").map((c) => c.name),
+      cast: (de.credits?.cast ?? [])
+        .slice()
+        .sort((a, b) => (a.order ?? 999) - (b.order ?? 999))
+        .slice(0, 14)
+        .map((c) => ({ id: c.id, name: c.name, character: c.character ?? "", profilePath: c.profile_path ?? null })),
+      trailerUrl: pickTrailer(de.videos?.results),
+      watch: Object.fromEntries(REGION_CODES.map((r) => [r, parseWatch(regions[r])])) as Record<Region, WatchInfo>,
+      collection: de.belongs_to_collection ? { id: de.belongs_to_collection.id, name: de.belongs_to_collection.name } : null,
+      recommendations: (de.recommendations?.results ?? []).filter((r) => r.poster_path),
+    }
+    const full: MovieFull = { info, extras }
+    fullCache.set(id, full)
+    return full
+  })()
+  fullPending.set(id, promise)
+  void promise.catch(() => {}).finally(() => fullPending.delete(id))
+  return promise
+}
 
-  const info: FilmInfo = {
-    tmdbId: de.id,
-    title: de.title || de.original_title || "Unbekannter Titel",
-    year: yearFromDate(de.release_date),
-    posterPath: de.poster_path ?? null,
-    backdropPath: de.backdrop_path ?? null,
-    genres: (de.genres ?? []).map((g) => g.name),
-    overview,
-    runtime: de.runtime ? de.runtime : null,
+/** Die Felder, die beim Hinzufügen im Film gecached werden. */
+export async function loadFilmInfo(id: number): Promise<FilmInfo> {
+  return (await loadMovieFull(id)).info
+}
+
+/** Vorläufige Film-Infos aus einem Listeneintrag – reicht, um die Detailseite sofort zu öffnen. */
+export function listItemToInfo(item: TmdbListItem): FilmInfo {
+  return {
+    tmdbId: item.id,
+    title: item.title || item.original_title || "Unbekannter Titel",
+    year: yearFromDate(item.release_date),
+    posterPath: item.poster_path ?? null,
+    backdropPath: item.backdrop_path ?? null,
+    genres: [],
+    overview: (item.overview ?? "").trim(),
+    runtime: null,
   }
-  infoCache.set(id, info)
-  return info
+}
+
+// ---------------------------------------------------------------------------
+// Filmreihen und Listen zum Stöbern
+// ---------------------------------------------------------------------------
+
+export interface Collection {
+  id: number
+  name: string
+  /** Nach Erscheinungsdatum sortiert; Teile ohne Datum am Ende. */
+  parts: TmdbListItem[]
+}
+
+const collectionCache = new Map<number, Collection>()
+
+/** Bereits geladene Filmreihe (ohne Netz), sonst null. */
+export function peekCollection(id: number): Collection | null {
+  return collectionCache.get(id) ?? null
+}
+
+export async function loadCollection(id: number): Promise<Collection> {
+  const cached = collectionCache.get(id)
+  if (cached) return cached
+  const data = await request<{ id: number; name: string; parts?: TmdbListItem[] }>(`${BASE}/collection/${id}?language=de-DE`)
+  const date = (p: TmdbListItem) => p.release_date || "9999"
+  const collection: Collection = {
+    id: data.id,
+    name: data.name.replace(/\s+(Filmreihe|Collection)$/i, ""),
+    parts: (data.parts ?? []).slice().sort((a, b) => date(a).localeCompare(date(b))),
+  }
+  collectionCache.set(id, collection)
+  return collection
+}
+
+export type BrowseSource =
+  | { kind: "trending" }
+  | { kind: "now_playing"; region: Region }
+  | { kind: "upcoming"; region: Region }
+  | { kind: "popular" }
+  | { kind: "top" }
+  | { kind: "genre"; genreId: number }
+  | { kind: "recommendations"; movieId: number }
+
+function browseUrl(source: BrowseSource): string {
+  const lang = "language=de-DE"
+  switch (source.kind) {
+    case "trending": return `${BASE}/trending/movie/week?${lang}`
+    case "now_playing": return `${BASE}/movie/now_playing?${lang}&region=${source.region}`
+    case "upcoming": return `${BASE}/movie/upcoming?${lang}&region=${source.region}`
+    case "popular": return `${BASE}/movie/popular?${lang}`
+    case "top": return `${BASE}/discover/movie?${lang}&include_adult=false&sort_by=vote_average.desc&vote_count.gte=5000`
+    case "genre": return `${BASE}/discover/movie?${lang}&include_adult=false&sort_by=popularity.desc&vote_count.gte=300&with_genres=${source.genreId}`
+    case "recommendations": return `${BASE}/movie/${source.movieId}/recommendations?${lang}`
+  }
+}
+
+const listCache = new Map<string, TmdbListItem[]>()
+
+/** Eine Filmliste zum Stöbern (nur Einträge mit Poster). Pro Sitzung gecached. */
+export async function loadList(source: BrowseSource): Promise<TmdbListItem[]> {
+  const url = browseUrl(source)
+  const cached = listCache.get(url)
+  if (cached) return cached
+  const data = await request<{ results?: TmdbListItem[] }>(url)
+  const items = (data.results ?? []).filter((r) => r.poster_path)
+  listCache.set(url, items)
+  return items
 }

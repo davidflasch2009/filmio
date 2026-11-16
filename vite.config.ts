@@ -32,6 +32,18 @@ export default defineConfig({
       workbox: {
         runtimeCaching: [
           {
+            // Filmdetails, Filmreihen und Stöber-Listen: online immer frisch, offline die zuletzt geladene Fassung.
+            // (Die Suche wird bewusst nicht gecached.)
+            urlPattern: /^https:\/\/api\.themoviedb\.org\/3\/(movie|collection|trending|discover)\//i,
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'tmdb-api',
+              networkTimeoutSeconds: 5,
+              expiration: { maxEntries: 400, maxAgeSeconds: 60 * 60 * 24 * 30 },
+              cacheableResponse: { statuses: [200] }
+            }
+          },
+          {
             urlPattern: /^https:\/\/image\.tmdb\.org\/.*/i,
             handler: 'CacheFirst',
             options: {

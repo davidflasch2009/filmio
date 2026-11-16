@@ -1,10 +1,10 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react"
 import type { Film, Store } from "./types"
-import { addFilm, load, removeFilm, STORAGE_KEY, updateFilm, type ImportResult } from "./lib/storage"
+import { addFilm, load, newFilm, removeFilm, STORAGE_KEY, updateFilm, type ImportResult } from "./lib/storage"
 import { formatRating } from "./lib/format"
-import { fetchBackdropPath, hasToken } from "./lib/tmdb"
+import { fetchBackdropPath, hasToken, listItemToInfo, type TmdbListItem } from "./lib/tmdb"
 import { useOnline } from "./hooks/useOnline"
-import { loadSettings, saveSettings, type GridSize } from "./lib/settings"
+import { loadSettings, saveSettings, type Settings } from "./lib/settings"
 import TabBar, { type Tab } from "./components/TabBar"
 import SearchView from "./components/SearchView"
 import WatchedView from "./components/WatchedView"
@@ -14,6 +14,22 @@ import MoreView from "./components/MoreView"
 import FilmDetail from "./components/FilmDetail"
 import RatingFlow, { type RatingResult } from "./components/RatingFlow"
 import RandomPick from "./components/RandomPick"
+import StatsView from "./components/StatsView"
+
+/** Zeitstempel für neue Einträge (außerhalb der Komponente, damit klar ist: nur in Ereignissen benutzt). */
+const nowIso = () => new Date().toISOString()
+const nowMs = () => Date.now()
+
+/** Eine geöffnete Detailseite. Von dort aus geöffnete Filme (Filmreihe, Empfehlungen) liegen als Stapel darüber. */
+interface DetailEntry {
+  tmdbId: number
+  /** Vorschau eines noch nicht gespeicherten Films; null = gespeicherter Film. */
+  draft: Film | null
+  /** Ohne Einblend-Animation zeigen. */
+  instant?: boolean
+  /** Scroll-Position, zu der beim Zurückkehren gesprungen wird. */
+  scroll?: number
+}
 
 interface Toast {
   id: number
@@ -25,8 +41,10 @@ export default function App() {
   const [store, setStore] = useState<Store>(load)
   const [tab, setTab] = useState<Tab>("watched")
   const [settings, setSettings] = useState(loadSettings)
-  /** Geöffnete Detailansicht: gespeicherter Film (per tmdbId) oder Vorschau eines Suchtreffers (draft). */
-  const [detail, setDetail] = useState<{ tmdbId: number; draft: Film | null; instant?: boolean } | null>(null)
+  /** Stapel der geöffneten Detailseiten; die oberste wird angezeigt. */
+  const [details, setDetails] = useState<DetailEntry[]>([])
+  const detailRef = useRef<HTMLDivElement>(null)
+  const [statsOpen, setStatsOpen] = useState(false)
   /** Film, der gerade bewertet wird. */
   const [rating, setRating] = useState<Film | null>(null)
   const [toast, setToast] = useState<Toast | null>(null)
@@ -72,7 +90,7 @@ export default function App() {
     return () => clearTimeout(t)
   }, [toast])
 
-  const overlayOpen = detail !== null || rating !== null || picking
+  const overlayOpen = details.length > 0 || rating !== null || picking || statsOpen
   useEffect(() => {
     document.body.classList.toggle("no-scroll", overlayOpen)
   }, [overlayOpen])
@@ -114,14 +132,14 @@ export default function App() {
       return
     }
     const entry: Film = {
-      ...film, status: "watchlist", rating: null, answers: null, watchedAt: null, fromNotes: false, addedAt: new Date().toISOString(),
+      ...film, status: "watchlist", rating: null, answers: null, watchedAt: null, fromNotes: false, addedAt: nowIso(),
     }
     if (persist(() => addFilm(entry))) notify(`„${film.title}“ zur Watchlist hinzugefügt.`)
   }
 
   function saveRating(film: Film, result: RatingResult) {
     const existing = findSaved(film.tmdbId)
-    const now = new Date().toISOString()
+    const now = nowIso()
     const updated: Film = {
       ...(existing ?? film),
       status: "watched",
@@ -137,7 +155,7 @@ export default function App() {
     if (persist(() => addFilm(updated))) {
       setRating(null)
       // Nach der Enthüllung direkt auf der Detailseite des Films landen.
-      setDetail((d) => ({ tmdbId: film.tmdbId, draft: null, instant: d?.tmdbId !== film.tmdbId }))
+      showSaved(film.tmdbId)
       notify(`Gespeichert · ★ ${formatRating(result.rating)}`)
     }
   }
@@ -151,13 +169,13 @@ export default function App() {
       rating: null,
       answers: null,
       fromNotes: false,
-      addedAt: existing?.addedAt ?? new Date().toISOString(),
+      addedAt: existing?.addedAt ?? nowIso(),
       // Wann genau, ist unbekannt – kein erfundenes Datum.
       watchedAt: existing?.status === "watched" ? existing.watchedAt : null,
     }
     if (persist(() => addFilm(updated))) {
       setRating(null)
-      setDetail((d) => ({ tmdbId: film.tmdbId, draft: null, instant: d?.tmdbId !== film.tmdbId }))
+      showSaved(film.tmdbId)
       notify("In „Früher gesehen“ gespeichert")
     }
   }
@@ -174,7 +192,7 @@ export default function App() {
     if (!window.confirm(`„${film.title}“ wirklich löschen?`)) return
     const snapshot = findSaved(film.tmdbId)
     if (persist(() => removeFilm(film.tmdbId))) {
-      setDetail(null)
+      closeDetail()
       notify(`„${film.title}“ gelöscht.`, snapshot
         ? () => { if (persist(() => addFilm(snapshot))) setToast(null) }
         : undefined)
@@ -189,19 +207,47 @@ export default function App() {
     persist(() => updateFilm(film.tmdbId, { fromNotes }))
   }
 
-  function changeGridSize(gridSize: GridSize) {
-    const next = { ...settings, gridSize }
+  function changeSettings(patch: Partial<Settings>) {
+    const next = { ...settings, ...patch }
     setSettings(next)
     saveSettings(next)
+  }
+
+  /** Mehrere Filme auf einmal auf die Watchlist (z.B. die fehlenden Teile einer Filmreihe). */
+  function addManyToWatchlist(list: Film[]) {
+    const fresh = list.filter((f) => !findSaved(f.tmdbId))
+    if (fresh.length === 0) return
+    const now = nowMs()
+    const ok = fresh.every((f, i) => persist(() => addFilm({
+      ...f, status: "watchlist", rating: null, answers: null, watchedAt: null, fromNotes: false, addedAt: new Date(now + i).toISOString(),
+    })))
+    if (ok) notify(fresh.length === 1 ? `„${fresh[0].title}“ zur Watchlist hinzugefügt.` : `${fresh.length} Filme zur Watchlist hinzugefügt.`)
   }
 
   function onImported(result: ImportResult) {
     setStore(result.store)
   }
 
-  const openSaved = (film: Film) => setDetail({ tmdbId: film.tmdbId, draft: null })
-  const openDetail = (film: Film, saved: boolean) => setDetail({ tmdbId: film.tmdbId, draft: saved ? null : film })
+  /** Detailseite eines gespeicherten Films aus einer Liste öffnen. */
+  const openSaved = (film: Film) => setDetails([{ tmdbId: film.tmdbId, draft: null }])
+  const closeDetail = () => setDetails((s) => s.slice(0, -1))
 
+  /**
+   * Film aus Suche, Stöber-Reihen, Filmreihe oder Empfehlungen öffnen – sofort, mit den Daten aus der Liste;
+   * die Detailseite lädt den Rest nach. Ist schon eine Detailseite offen, kommt der Film darüber.
+   */
+  function openItem(item: TmdbListItem) {
+    const entry: DetailEntry = { tmdbId: item.id, draft: findSaved(item.id) ? null : newFilm(listItemToInfo(item)) }
+    const scroll = detailRef.current?.scrollTop ?? 0
+    setDetails((s) => (s.length === 0 ? [entry] : [...s.slice(0, -1), { ...s[s.length - 1], scroll, instant: true }, entry]))
+  }
+
+  /** Nach dem Speichern die Detailseite des Films zeigen (falls sie nicht schon offen ist). */
+  function showSaved(tmdbId: number) {
+    setDetails((s) => (s.length > 0 && s[s.length - 1].tmdbId === tmdbId ? s : [...s, { tmdbId, draft: null, instant: true }]))
+  }
+
+  const detail = details[details.length - 1] ?? null
   const savedDetail = detail ? findSaved(detail.tmdbId) : undefined
   const detailFilm = savedDetail ?? detail?.draft ?? null
 
@@ -226,28 +272,38 @@ export default function App() {
         <div hidden={tab !== "search"}>
           <SearchView
             films={store.films}
+            region={settings.region}
+            active={tab === "search"}
             onAddToWatchlist={addToWatchlist}
             onRate={setRating}
-            onOpenDetail={openDetail}
+            onOpenItem={openItem}
             onError={notify}
           />
         </div>
         <div hidden={tab !== "more"}>
-          <MoreView store={store} onImported={onImported} gridSize={settings.gridSize} onGridSizeChange={changeGridSize} />
+          <MoreView store={store} onImported={onImported} settings={settings} onSettingsChange={changeSettings} onOpenStats={() => setStatsOpen(true)} />
         </div>
       </main>
 
       <TabBar active={tab} onChange={changeTab} />
 
+      {statsOpen && <StatsView films={store.films} onClose={() => setStatsOpen(false)} onOpen={openSaved} />}
+
       {detailFilm && (
         <FilmDetail
-          key={detailFilm.tmdbId}
+          key={`${details.length}-${detailFilm.tmdbId}`}
           film={detailFilm}
           saved={savedDetail !== undefined}
           instant={detail?.instant}
-          onClose={() => setDetail(null)}
+          initialScroll={detail?.scroll}
+          scrollerRef={detailRef}
+          region={settings.region}
+          films={store.films}
+          onClose={closeDetail}
+          onOpenItem={openItem}
           onRate={setRating}
           onAddToWatchlist={addToWatchlist}
+          onAddManyToWatchlist={addManyToWatchlist}
           onMoveToWatchlist={moveToWatchlist}
           onDelete={deleteFilm}
           onSaveNote={saveNote}

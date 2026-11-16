@@ -1,26 +1,32 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react"
 import type { Film } from "../types"
-import { hasToken, loadFilmInfo, searchMovies, yearFromDate, type TmdbSearchResult } from "../lib/tmdb"
+import { hasToken, loadFilmInfo, searchMovies, yearFromDate, type TmdbListItem, type TmdbSearchResult } from "../lib/tmdb"
+import type { Region } from "../lib/settings"
 import { newFilm } from "../lib/storage"
 import { formatRating } from "../lib/format"
 import FilmCard from "./FilmCard"
 import ViewHeader from "./ViewHeader"
 import { IconCheck, IconPlus } from "./Icons"
 import SearchField from "./SearchField"
+import BrowseView from "./BrowseView"
 import { useOnline } from "../hooks/useOnline"
 
 interface Props {
   films: Film[]
+  region: Region
+  /** true, solange der Such-Tab sichtbar ist (die Stöber-Reihen laden erst dann). */
+  active: boolean
   onAddToWatchlist: (film: Film) => void
   onRate: (film: Film) => void
-  onOpenDetail: (film: Film, saved: boolean) => void
+  /** Detailseite öffnen (gespeicherter Film oder Vorschau). */
+  onOpenItem: (item: TmdbListItem) => void
   /** Fehler bei Aktionen auf einem Treffer (als Toast, da die Karte weit unten sein kann). */
   onError: (message: string) => void
 }
 
 const DEBOUNCE_MS = 450
 
-export default function SearchView({ films, onAddToWatchlist, onRate, onOpenDetail, onError }: Props) {
+export default function SearchView({ films, region, active, onAddToWatchlist, onRate, onOpenItem, onError }: Props) {
   const online = useOnline()
   const [query, setQuery] = useState("")
   const [results, setResults] = useState<TmdbSearchResult[] | null>(null)
@@ -133,7 +139,7 @@ export default function SearchView({ films, onAddToWatchlist, onRate, onOpenDeta
                 year={year}
                 posterPath={r.poster_path}
                 badge={badge}
-                onOpen={() => (saved ? onOpenDetail(saved, true) : void withDetails(r.id, (f) => onOpenDetail(f, false)))}
+                onOpen={() => onOpenItem(r)}
               >
                 {!saved && (
                   <button type="button" className="pill" disabled={busyId !== null}
@@ -153,6 +159,10 @@ export default function SearchView({ films, onAddToWatchlist, onRate, onOpenDeta
         </div>
       )}
 
+      {/* Ohne Suchbegriff: Stöbern wie in einer Streaming-App. Bleibt eingehängt, damit Scroll-Positionen erhalten bleiben. */}
+      <div hidden={query.trim() !== ""}>
+        <BrowseView films={films} region={region} active={active} onOpenItem={onOpenItem} />
+      </div>
     </section>
   )
 }

@@ -1,22 +1,24 @@
 import { useRef, useState, type FormEvent } from "react"
 import type { Store } from "../types"
 import { exportJson, importJson, type ImportMode, type ImportResult } from "../lib/storage"
-import { GRID_SIZES, type GridSize } from "../lib/settings"
+import { GRID_SIZES, REGIONS, type Settings } from "../lib/settings"
 import { appVersion } from "../lib/updates"
 import tmdbLogo from "../assets/tmdb-logo.svg"
 import ViewHeader from "./ViewHeader"
-import { IconCheck, IconChevronRight, IconDownload, IconUpload } from "./Icons"
+import { IconChart, IconCheck, IconChevronRight, IconDownload, IconUpload } from "./Icons"
 
 interface Props {
   store: Store
   onImported: (result: ImportResult) => void
-  gridSize: GridSize
-  onGridSizeChange: (size: GridSize) => void
+  settings: Settings
+  onSettingsChange: (patch: Partial<Settings>) => void
+  onOpenStats: () => void
 }
 
 type Message = { kind: "ok" | "error"; text: string }
 
-export default function MoreView({ store, onImported, gridSize, onGridSizeChange }: Props) {
+export default function MoreView({ store, onImported, settings, onSettingsChange, onOpenStats }: Props) {
+  const { gridSize, region } = settings
   const fileRef = useRef<HTMLInputElement>(null)
   const [file, setFile] = useState<File | null>(null)
   const [mode, setMode] = useState<ImportMode>("merge")
@@ -71,6 +73,14 @@ export default function MoreView({ store, onImported, gridSize, onGridSizeChange
     <section className="view" aria-labelledby="more-heading">
       <ViewHeader id="more-heading" title="Mehr" />
 
+      <div className="group">
+        <button type="button" className="group-row row-button" onClick={onOpenStats}>
+          <span className="row-icon"><IconChart /></span>
+          <span className="row-text">Statistik</span>
+          <IconChevronRight className="row-chevron" />
+        </button>
+      </div>
+
       <h2 className="group-label">Darstellung</h2>
       <div className="group">
         <fieldset className="group-row segmented">
@@ -83,10 +93,21 @@ export default function MoreView({ store, onImported, gridSize, onGridSizeChange
                   name="grid-size"
                   value={g.id}
                   checked={gridSize === g.id}
-                  onChange={() => onGridSizeChange(g.id)}
+                  onChange={() => onSettingsChange({ gridSize: g.id })}
                 />
                 <span className="segment-label">{g.label}</span>
                 <span className="segment-hint">{g.hint}</span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
+        <fieldset className="group-row segmented">
+          <legend>Land für Streaming-Anbieter</legend>
+          <div className="segments">
+            {REGIONS.map((r) => (
+              <label key={r.id} className={region === r.id ? "segment segment-active" : "segment"}>
+                <input type="radio" name="region" value={r.id} checked={region === r.id} onChange={() => onSettingsChange({ region: r.id })} />
+                <span className="segment-label">{r.label}</span>
               </label>
             ))}
           </div>

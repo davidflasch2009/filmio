@@ -70,6 +70,15 @@ src/
 └─ components/          TabBar, ViewHeader, Views, FilmCard, FilterChip, FilmDetail, RatingFlow (inkl. Sterne-Enthüllung), StarRating, Icons
 ```
 
+## Funktionen
+
+- **Gesehen / Watchlist / Früher / Suche / Mehr** als Tabs; Gesehen mit Suche, Sortierung, Genre-, Sterne- und „Aus Notizen“-Filter
+- **Suche** ohne Begriff = Stöbern wie in einer Streaming-App: Trends, Empfehlungen zu einem Film, der dir gefallen hat, Kino, Genres, Bestbewertet
+- **Detailseite**: Szenenbild, Handlung, Notiz, Antwortprofil, *Wo läuft der Film?* (Streaming-Anbieter per TMDB/JustWatch, Land unter Mehr wählbar),
+  Regie und Besetzung, Trailer, Filmreihe (mit „Fehlende auf die Watchlist“), ähnliche Filme; vom linken Rand wischen = zurück
+- **Würfel** auf der Watchlist, filterbar nach Genre und „Unter 2 Std.“
+- **Statistik** unter Mehr: Anzahl, Stunden, Schnitt, Sterne-Verteilung, beste Filme, Lieblingsgenres, Jahrzehnte, häufigste Ja-Antworten
+
 ## Design
 
 Dunkel, ruhig, große Bilder – angelehnt an Apple TV. Die App startet in **Gesehen**, die Tabs sind

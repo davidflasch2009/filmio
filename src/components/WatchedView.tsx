@@ -34,6 +34,8 @@ export default function WatchedView({ films, onOpen, onFindFilms }: Props) {
   const [genre, setGenre] = useState("")
   const [minRating, setMinRating] = useState(0)
   const [query, setQuery] = useState("")
+  /** Nur Filme zeigen, deren Bewertung aus den eigenen Notizen stammt. */
+  const [notesOnly, setNotesOnly] = useState(false)
 
   // Gesehene Filme ohne Bewertung stehen im Tab „Früher“.
   const watched = useMemo(() => films.filter((f) => f.status === "watched" && f.rating !== null), [films])
@@ -53,6 +55,7 @@ export default function WatchedView({ films, onOpen, onFindFilms }: Props) {
     const list = watched.filter((f) =>
       (!genre || f.genres.includes(genre)) &&
       (f.rating ?? 0) >= minRating &&
+      (!notesOnly || f.fromNotes) &&
       (!q || normalizeText(f.title).includes(q) || normalizeText(f.note).includes(q)))
 
     const sorted = [...list]
@@ -74,14 +77,18 @@ export default function WatchedView({ films, onOpen, onFindFilms }: Props) {
         break
     }
     return sorted
-  }, [watched, sort, genre, minRating, query])
+  }, [watched, sort, genre, minRating, query, notesOnly])
+  const notesCount = watched.filter((f) => f.fromNotes).length
+  // Gibt es keine solchen Filme mehr, verschwindet der Umschalter – dann darf der Filter nicht hängen bleiben.
+  if (notesOnly && notesCount === 0) setNotesOnly(false)
 
-  const filtered = genre !== "" || minRating !== 0 || query.trim() !== ""
+  const filtered = genre !== "" || minRating !== 0 || query.trim() !== "" || notesOnly
 
   function resetFilters() {
     setGenre("")
     setMinRating(0)
     setQuery("")
+    setNotesOnly(false)
   }
 
   return (
@@ -102,6 +109,16 @@ export default function WatchedView({ films, onOpen, onFindFilms }: Props) {
                 idleLabel="Genre"
               />
               <FilterChip id="watched-rating" label="Bewertung" options={minOptions} value={minRating} onChange={setMinRating} active={minRating !== 0} idleLabel="Sterne" />
+              {notesCount > 0 && (
+                <button
+                  type="button"
+                  className={`chip chip-toggle${notesOnly ? " chip-active" : ""}`}
+                  aria-pressed={notesOnly}
+                  onClick={() => setNotesOnly((v) => !v)}
+                >
+                  <IconNote /><span className="chip-text">Aus Notizen</span>
+                </button>
+              )}
             </div>
           </>
         )}

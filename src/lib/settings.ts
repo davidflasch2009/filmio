@@ -12,20 +12,41 @@ export const GRID_SIZES: { id: GridSize; label: string; hint: string }[] = [
   { id: "l", label: "Groß", hint: "2 pro Reihe" },
 ]
 
+/** Land für Streaming-Anbieter und Kinostarts. */
+export type Region = "DE" | "AT" | "CH"
+
+export const REGIONS: { id: Region; label: string }[] = [
+  { id: "DE", label: "Deutschland" },
+  { id: "AT", label: "Österreich" },
+  { id: "CH", label: "Schweiz" },
+]
+
 export interface Settings {
   gridSize: GridSize
+  region: Region
 }
 
-const DEFAULTS: Settings = { gridSize: "m" }
+/** Land aus der Spracheinstellung des Geräts (de-AT → Österreich …), sonst Deutschland. */
+function defaultRegion(): Region {
+  const langs = typeof navigator === "undefined" ? [] : [...(navigator.languages ?? []), navigator.language ?? ""]
+  for (const l of langs) {
+    const m = /-(DE|AT|CH)$/i.exec(l)
+    if (m) return m[1].toUpperCase() as Region
+  }
+  return "DE"
+}
 
 export function loadSettings(): Settings {
+  const defaults: Settings = { gridSize: "m", region: defaultRegion() }
   try {
     const raw = localStorage.getItem(SETTINGS_KEY)
-    const parsed: unknown = raw ? JSON.parse(raw) : null
-    const gridSize = (parsed as Partial<Settings> | null)?.gridSize
-    return { ...DEFAULTS, ...(GRID_SIZES.some((g) => g.id === gridSize) ? { gridSize } : {}) }
+    const parsed = (raw ? JSON.parse(raw) : null) as Partial<Settings> | null
+    return {
+      gridSize: GRID_SIZES.some((g) => g.id === parsed?.gridSize) ? parsed!.gridSize! : defaults.gridSize,
+      region: REGIONS.some((r) => r.id === parsed?.region) ? parsed!.region! : defaults.region,
+    }
   } catch {
-    return { ...DEFAULTS }
+    return defaults
   }
 }
 
