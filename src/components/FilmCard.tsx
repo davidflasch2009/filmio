@@ -53,15 +53,20 @@ interface Props {
   posterPath: string | null
   rating?: number | null
   badge?: ReactNode
+  /** Kleines Symbol in der Poster-Ecke (z.B. „aus meinen Notizen“); label für Screenreader/Tooltip. */
+  marker?: { icon: ReactNode; label: string }
   onOpen?: () => void
   children?: ReactNode
 }
 
 /** Karte für Listen und Suchtreffer: Poster, Titel, Sterne + Jahr, optional Hinweis und Buttons. */
-export default function FilmCard({ title, year, posterPath, rating, badge, onOpen, children }: Props) {
+export default function FilmCard({ title, year, posterPath, rating, badge, marker, onOpen, children }: Props) {
   const body = (
     <>
-      <Poster path={posterPath} title={title} />
+      <span className="poster-wrap">
+        <Poster path={posterPath} title={title} />
+        {marker && <span className="poster-marker" role="img" aria-label={marker.label} title={marker.label}>{marker.icon}</span>}
+      </span>
       <span className="card-text">
         <span className="card-title">{title}</span>
         {(rating != null || year !== null) && (

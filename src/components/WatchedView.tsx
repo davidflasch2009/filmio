@@ -5,6 +5,7 @@ import FilmCard from "./FilmCard"
 import FilterChip from "./FilterChip"
 import ViewHeader from "./ViewHeader"
 import SearchField from "./SearchField"
+import { IconNote } from "./Icons"
 
 type SortKey = "rating-desc" | "rating-asc" | "added-desc" | "watched-desc" | "title"
 
@@ -15,6 +16,9 @@ const SORTS: { value: SortKey; label: string }[] = [
   { value: "watched-desc", label: "Zuletzt gesehen" },
   { value: "title", label: "Titel A–Z" },
 ]
+
+/** Markierung für Bewertungen, die aus den eigenen Notizen übernommen wurden. */
+const NOTES_MARKER = { icon: <IconNote />, label: "Bewertung aus meinen Notizen" }
 
 interface Props {
   films: Film[]
@@ -127,6 +131,7 @@ export default function WatchedView({ films, onOpen, onFindFilms }: Props) {
                   year={f.year}
                   posterPath={f.posterPath}
                   rating={f.rating}
+                  marker={f.fromNotes ? NOTES_MARKER : undefined}
                   onOpen={() => onOpen(f)}
                 />
               ))}
