@@ -63,3 +63,12 @@ export const IconDice = (p: IconProps) => (
     <circle cx="15.5" cy="15.5" r="1.4" fill="currentColor" stroke="none" />
   </Svg>
 )
+export const IconUser = (p: IconProps) => (
+  <Svg {...p}><circle cx="12" cy="8.5" r="3.6" /><path d="M5 19.5c1.2-3.3 3.9-5 7-5s5.8 1.7 7 5" /></Svg>
+)
+export const IconSync = (p: IconProps) => (
+  <Svg {...p}><path d="M19 12a7 7 0 0 1-12.2 4.7M5 12a7 7 0 0 1 12.2-4.7" /><path d="M17.5 3.8v3.9h-3.9M6.5 20.2v-3.9h3.9" /></Svg>
+)
+export const IconLogout = (p: IconProps) => (
+  <Svg {...p}><path d="M14 4.5H7.5a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2H14" /><path d="M11 12h9m-3-3.5 3.5 3.5-3.5 3.5" /></Svg>
+)

@@ -1,14 +1,17 @@
-import { useRef, useState, type FormEvent } from "react"
+import { useRef, useState, useSyncExternalStore, type FormEvent } from "react"
 import type { Store } from "../types"
 import { exportJson, importJson, type ImportMode, type ImportResult } from "../lib/storage"
 import { GRID_SIZES, REGIONS, type Settings } from "../lib/settings"
 import { appVersion } from "../lib/updates"
+import { getSyncState, subscribeSync, syncNow, type SyncState } from "../lib/sync"
 import tmdbLogo from "../assets/tmdb-logo.svg"
 import ViewHeader from "./ViewHeader"
-import { IconChart, IconCheck, IconChevronRight, IconDownload, IconUpload } from "./Icons"
+import { IconChart, IconCheck, IconChevronRight, IconDownload, IconLogout, IconSync, IconUpload, IconUser } from "./Icons"
 
 interface Props {
   store: Store
+  account: string
+  onSignOut: () => void
   onImported: (result: ImportResult) => void
   settings: Settings
   onSettingsChange: (patch: Partial<Settings>) => void
@@ -17,13 +20,26 @@ interface Props {
 
 type Message = { kind: "ok" | "error"; text: string }
 
-export default function MoreView({ store, onImported, settings, onSettingsChange, onOpenStats }: Props) {
+function syncText(state: SyncState): string {
+  if (state.status === "syncing") return "Wird abgeglichen …"
+  if (state.status === "offline") return "Offline – wird abgeglichen, sobald du wieder online bist"
+  if (state.status === "error") return state.error ?? "Abgleich fehlgeschlagen"
+  if (!state.lastSync) return "Noch nicht abgeglichen"
+  const min = Math.floor((Date.now() - state.lastSync) / 60_000)
+  if (min < 1) return "Abgeglichen · gerade eben"
+  if (min < 60) return `Abgeglichen · vor ${min} Min.`
+  const time = new Date(state.lastSync).toLocaleString("de-DE", { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" })
+  return `Abgeglichen · ${time}`
+}
+
+export default function MoreView({ store, account, onSignOut, onImported, settings, onSettingsChange, onOpenStats }: Props) {
   const { gridSize, region } = settings
   const fileRef = useRef<HTMLInputElement>(null)
   const [file, setFile] = useState<File | null>(null)
   const [mode, setMode] = useState<ImportMode>("merge")
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState<Message | null>(null)
+  const sync = useSyncExternalStore(subscribeSync, getSyncState)
 
   const watched = store.films.filter((f) => f.status === "watched").length
   const watchlist = store.films.length - watched
@@ -72,6 +88,24 @@ export default function MoreView({ store, onImported, settings, onSettingsChange
   return (
     <section className="view" aria-labelledby="more-heading">
       <ViewHeader id="more-heading" title="Mehr" />
+
+      <div className="group account">
+        <div className="group-row account-row">
+          <span className="row-icon"><IconUser /></span>
+          <span className="row-text">
+            {account || "Dein Account"}
+            <span className={`row-sub sync-${sync.status}`} role="status">{syncText(sync)}</span>
+          </span>
+        </div>
+        <button type="button" className="group-row row-button" onClick={() => void syncNow()} disabled={sync.status === "syncing"}>
+          <span className="row-icon"><IconSync /></span>
+          <span className="row-text">Jetzt abgleichen</span>
+        </button>
+        <button type="button" className="group-row row-button row-danger" onClick={onSignOut}>
+          <span className="row-icon"><IconLogout /></span>
+          <span className="row-text">Abmelden</span>
+        </button>
+      </div>
 
       <div className="group">
         <button type="button" className="group-row row-button" onClick={onOpenStats}>
@@ -123,8 +157,7 @@ export default function MoreView({ store, onImported, settings, onSettingsChange
         </button>
       </div>
       <p className="group-note">
-        Deine Liste liegt nur auf diesem Gerät ({watched} gesehen, {watchlist} auf der Watchlist).
-        Exportiere regelmäßig ein Backup.
+        {watched} gesehen, {watchlist} auf der Watchlist – auf allen Geräten, auf denen du angemeldet bist.
       </p>
 
       <form onSubmit={onImport} className="group import-form">
@@ -174,7 +207,7 @@ export default function MoreView({ store, onImported, settings, onSettingsChange
       <div className="group about">
         <div className="group-row">
           <p className="about-app"><span className="logo">filmio</span> – deine persönliche Filmliste.</p>
-          <p className="hint">Alle Daten bleiben lokal auf deinem Gerät. Kein Konto, kein Server.</p>
+          <p className="hint">Deine Liste liegt auf deinen Geräten und in deinem eigenen Supabase-Projekt (Frankfurt).</p>
           <p className="hint app-version">Version {appVersion()}</p>
         </div>
         <div className="group-row attribution">

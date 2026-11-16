@@ -5,7 +5,8 @@ Deine persönliche Filmliste als installierbare Web-App (PWA).
 - **Watchlist** (will ich sehen) und **Gesehen** (mit eigener Bewertung)
 - Filmsuche über die **TMDB-API** (Poster, Titel, Jahr, Genres, Handlung, Laufzeit)
 - **Bewertung** wird aus **15 Ja/Neutral/Nein-Fragen** berechnet (0,5–5 Sterne)
-- Daten liegen **nur lokal** im Browser – mit **JSON-Export/Import**
+- **Ein Account** (Name + Passwort): Die Liste wird zwischen allen angemeldeten Geräten abgeglichen (Supabase)
+- Jedes Gerät hat die komplette Liste lokal – mit **JSON-Export/Import**
 - Offline nutzbar (außer der Suche), gehostet auf **GitHub Pages**
 
 Die vollständige Spezifikation steht in [`Anleitung.md`](Anleitung.md), die Planungsnotizen in [`planning/`](planning/).
@@ -43,6 +44,18 @@ Einmalig einrichten:
 
 > **Hinweis:** Der Token ist im ausgelieferten Bundle sichtbar. Nur einen **nicht-kommerziellen Wegwerf-Key** verwenden und ihn bei Missbrauch in TMDB neu generieren.
 
+## Account & Abgleich
+
+- Beim ersten Öffnen kommt ein Anmelde-Bildschirm. Gibt es noch keinen Account, wird er dort **einmalig** erstellt;
+  danach lehnt der Server jede weitere Registrierung ab (Trigger auf `auth.users`, siehe [`supabase/schema.sql`](supabase/schema.sql)).
+- Angemeldet bleibt man, bis man sich unter **Mehr → Abmelden** abmeldet.
+- Der Name wird intern zu `name@filmio.invalid` (an diese Adresse kann nie eine Mail gehen).
+- Abgleich beim Start, beim Zurückkehren in die App, nach jeder Änderung und jede Minute, solange die App offen ist.
+  Pro Film gewinnt die jüngere Änderung (`updatedAt`), Löschungen werden über Lösch-Marker (`deleted`) weitergegeben.
+  Speichern auf dem Server klappt nur mit passender Revision – sonst wird neu zusammengeführt.
+- Offline funktioniert alles weiter; abgeglichen wird, sobald wieder Internet da ist.
+- Projekt-URL und *Publishable Key* stehen in `src/lib/cloud.ts` (öffentlich gedacht; geschützt wird über Anmeldung + Row Level Security).
+
 ## Daten & Backup
 
 - Gespeichert wird in `localStorage` unter dem Schlüssel `filmio.v1` (`{ version: 1, films: [...] }`).
@@ -61,7 +74,9 @@ src/
 ├─ styles.css           Design „Apple TV“ (dunkel, Systemschrift, Gelb als Akzent)
 ├─ hooks/useOnline.ts   Online-/Offline-Status
 ├─ lib/
-│  ├─ storage.ts        localStorage-CRUD + Export/Import + Validierung
+│  ├─ storage.ts        localStorage-CRUD + Export/Import + Validierung (+ Zeitstempel/Lösch-Marker)
+│  ├─ cloud.ts          Supabase: Anmeldung (ein Account), Sitzung, Liste laden/speichern
+│  ├─ sync.ts           Abgleich zwischen Geräten (Zusammenführen, automatisch)
 │  ├─ tmdb.ts           TMDB-Client (de-DE, en-US-Fallback für die Handlung, Poster/Szenenbilder)
 │  ├─ scoring.ts        die 15 Fragen + Score-Formel
 │  ├─ settings.ts       Darstellung (Kartengröße), gerätebezogen

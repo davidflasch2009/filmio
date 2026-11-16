@@ -17,11 +17,14 @@ export interface Film {
   watchedAt: string | null        // ISO-Datum, wenn als gesehen markiert
   fromNotes: boolean              // Bewertung aus den eigenen Notizen übernommen, nicht in der App bewertet
   backdropPath?: string | null    // Szenenbild für die Detailseite; fehlt = noch nicht von TMDB geholt
+  updatedAt?: string              // ISO-Datum der letzten eigenen Änderung (für den Abgleich zwischen Geräten)
 }
 
 export interface Store {
   version: 1
   films: Film[]
+  /** Gelöschte Filme (tmdbId → ISO-Datum), damit das Löschen auch auf den anderen Geräten ankommt. */
+  deleted?: Record<string, string>
 }
 
 /** Die von TMDB übernommenen (gecachten) Felder eines Films. */

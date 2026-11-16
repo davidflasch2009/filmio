@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react"
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react"
 import type { Film, Store } from "./types"
 import { addFilm, load, newFilm, removeFilm, STORAGE_KEY, updateFilm, type ImportResult } from "./lib/storage"
 import { formatRating } from "./lib/format"
@@ -15,6 +15,9 @@ import FilmDetail from "./components/FilmDetail"
 import RatingFlow, { type RatingResult } from "./components/RatingFlow"
 import RandomPick from "./components/RandomPick"
 import StatsView from "./components/StatsView"
+import LoginScreen from "./components/LoginScreen"
+import { loadSession, onSessionChange, signOut, type Session } from "./lib/cloud"
+import { resetSyncState, startSync } from "./lib/sync"
 
 /** Zeitstempel für neue Einträge (außerhalb der Komponente, damit klar ist: nur in Ereignissen benutzt). */
 const nowIso = () => new Date().toISOString()
@@ -37,7 +40,19 @@ interface Toast {
   undo?: () => void
 }
 
+/** Ohne Anmeldung keine App: erst der Anmelde-Bildschirm, danach filmio. */
 export default function App() {
+  const [session, setSession] = useState<Session | null>(loadSession)
+
+  // Abgelaufene Anmeldung (oder Abmelden auf diesem Gerät) → zurück zum Anmelde-Bildschirm.
+  useEffect(() => onSessionChange(setSession), [])
+  const signedOut = useCallback(() => setSession(null), [])
+
+  if (!session) return <LoginScreen onSignedIn={setSession} />
+  return <FilmApp account={session.name} onSignOut={signedOut} />
+}
+
+function FilmApp({ account, onSignOut }: { account: string; onSignOut: () => void }) {
   const [store, setStore] = useState<Store>(load)
   const [tab, setTab] = useState<Tab>("watched")
   const [settings, setSettings] = useState(loadSettings)
@@ -62,6 +77,10 @@ export default function App() {
     return () => window.removeEventListener("storage", onStorage)
   }, [])
 
+  // Abgleich mit den anderen Geräten. Übernommene Änderungen frisch aus dem Speicher lesen –
+  // so geht keine Eingabe verloren, die während des Abgleichs passiert ist.
+  useEffect(() => startSync({ onRemoteChange: () => setStore(load()), onSignedOut: onSignOut }), [onSignOut])
+
   // Szenenbilder für Filme nachladen, die noch keins haben (z.B. aus einem Import oder älteren Versionen).
   const needsBackdrops = store.films.some((f) => f.backdropPath === undefined)
   useEffect(() => {
@@ -74,7 +93,7 @@ export default function App() {
         try {
           const backdropPath = await fetchBackdropPath(id)
           if (cancelled) return
-          setStore(updateFilm(id, { backdropPath }))
+          setStore(updateFilm(id, { backdropPath }, { touch: false }))
         } catch {
           // Netzfehler o.ä.: beim nächsten Start erneut versuchen.
         }
@@ -228,6 +247,12 @@ export default function App() {
     setStore(result.store)
   }
 
+  async function logOut() {
+    if (!window.confirm("Auf diesem Gerät abmelden? Zum Weiterverwenden musst du dich wieder anmelden.")) return
+    resetSyncState()
+    await signOut()
+  }
+
   /** Detailseite eines gespeicherten Films aus einer Liste öffnen. */
   const openSaved = (film: Film) => setDetails([{ tmdbId: film.tmdbId, draft: null }])
   const closeDetail = () => setDetails((s) => s.slice(0, -1))
@@ -281,7 +306,7 @@ export default function App() {
           />
         </div>
         <div hidden={tab !== "more"}>
-          <MoreView store={store} onImported={onImported} settings={settings} onSettingsChange={changeSettings} onOpenStats={() => setStatsOpen(true)} />
+          <MoreView store={store} account={account} onSignOut={logOut} onImported={onImported} settings={settings} onSettingsChange={changeSettings} onOpenStats={() => setStatsOpen(true)} />
         </div>
       </main>
 

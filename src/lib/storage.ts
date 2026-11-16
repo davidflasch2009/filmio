@@ -66,6 +66,7 @@ function checkFilm(x: unknown): FilmCheck {
   // Später ergänztes Feld: fehlt es (ältere Backups), gilt false.
   if (!(f.fromNotes === undefined || typeof f.fromNotes === "boolean")) return fail("fromNotes", "true/false")
   if (!(f.backdropPath === undefined || isNullableString(f.backdropPath))) return fail("backdropPath", "Text oder null")
+  if (!(f.updatedAt === undefined || isIsoDate(f.updatedAt))) return fail("updatedAt", "ISO-Datum")
 
   return {
     ok: true,
@@ -86,8 +87,29 @@ function checkFilm(x: unknown): FilmCheck {
       fromNotes: f.fromNotes ?? false,
       // Fehlt das Feld, holt die App das Szenenbild später nach.
       ...(f.backdropPath === undefined ? {} : { backdropPath: f.backdropPath }),
+      ...(f.updatedAt === undefined ? {} : { updatedAt: f.updatedAt }),
     },
   }
+}
+
+/** Lösch-Marker (tmdbId → ISO-Datum); ungültige Einträge werden still verworfen. */
+function checkDeleted(x: unknown): Record<string, string> | undefined {
+  if (!isObject(x)) return undefined
+  const out: Record<string, string> = {}
+  for (const [id, at] of Object.entries(x)) {
+    if (/^\d+$/.test(id) && isIsoDate(at)) out[id] = at
+  }
+  return Object.keys(out).length ? out : undefined
+}
+
+/** Store mit neuer Filmliste; Lösch-Marker bleiben erhalten. */
+function withFilms(store: Store, films: Film[], deleted: Record<string, string> | undefined = store.deleted): Store {
+  return deleted && Object.keys(deleted).length ? { version: 1, films, deleted } : { version: 1, films }
+}
+
+/** Zeitpunkt der letzten Änderung eines Films (ältere Einträge haben noch kein updatedAt). */
+export function changedAt(film: Film): string {
+  return film.updatedAt ?? film.watchedAt ?? film.addedAt
 }
 
 /** Entfernt doppelte tmdbIds (der spätere Eintrag gewinnt, Position des ersten bleibt). */
@@ -151,18 +173,36 @@ export function load(): Store {
     return emptyStore()
   }
 
+  const store = parseStore(parsed)
+  if (!store || store.films.length !== parsed.films.length) backupCorrupt(raw)
+  return store ?? emptyStore()
+}
+
+/** Nachsichtiges Einlesen (lokaler Speicher, Daten vom Server): ungültige Filme werden übersprungen. */
+export function parseStore(data: unknown): Store | null {
+  if (!isObject(data) || data.version !== 1 || !Array.isArray(data.films)) return null
   const films: Film[] = []
-  for (const entry of parsed.films) {
+  for (const entry of data.films) {
     const check = checkFilm(entry)
     if (check.ok) films.push(check.film)
   }
-  if (films.length !== parsed.films.length) backupCorrupt(raw)
-  return { version: 1, films: dedupe(films) }
+  return withFilms(emptyStore(), dedupe(films), checkDeleted(data.deleted))
 }
 
-export function save(store: Store): void {
+type ChangeListener = (store: Store) => void
+const listeners = new Set<ChangeListener>()
+
+/** Meldet jede eigene Änderung (nicht die vom Abgleich übernommenen). */
+export function onLocalChange(fn: ChangeListener): () => void {
+  listeners.add(fn)
+  return () => { listeners.delete(fn) }
+}
+
+/** Speichert den Store. `silent`: Änderung kam vom Abgleich und muss nicht wieder hochgeladen werden. */
+export function save(store: Store, { silent = false }: { silent?: boolean } = {}): void {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(store))
+    if (!silent) listeners.forEach((fn) => fn(store))
   } catch (e) {
     const quota = e instanceof DOMException && (e.name === "QuotaExceededError" || e.code === 22)
     throw new Error(quota
@@ -189,31 +229,44 @@ export function newFilm(info: FilmInfo, status: Status = "watchlist"): Film {
   }
 }
 
+const nowIso = () => new Date().toISOString()
+
+/** Lösch-Marker ohne die angegebenen Filme (sie sind wieder da). */
+function withoutDeleted(deleted: Record<string, string> | undefined, ids: Iterable<number>): Record<string, string> | undefined {
+  if (!deleted) return undefined
+  const next = { ...deleted }
+  for (const id of ids) delete next[id]
+  return next
+}
+
 /** Fügt einen Film hinzu. Existiert die tmdbId schon, wird der Eintrag ersetzt (addedAt bleibt). */
 export function addFilm(film: Film): Store {
   const store = load()
+  const stamped: Film = { ...film, updatedAt: nowIso() }
   const existing = store.films.find((f) => f.tmdbId === film.tmdbId)
   const films = existing
-    ? store.films.map((f) => (f.tmdbId === film.tmdbId ? { ...film, addedAt: existing.addedAt } : f))
-    : [...store.films, film]
-  const next: Store = { version: 1, films }
+    ? store.films.map((f) => (f.tmdbId === film.tmdbId ? { ...stamped, addedAt: existing.addedAt } : f))
+    : [...store.films, stamped]
+  const next = withFilms(store, films, withoutDeleted(store.deleted, [film.tmdbId]))
   save(next)
   return next
 }
 
-export function updateFilm(tmdbId: number, patch: Partial<Omit<Film, "tmdbId">>): Store {
+/**
+ * Ändert einen Film. `touch: false` für automatische Ergänzungen (z.B. nachgeladenes Szenenbild):
+ * die zählen beim Abgleich nicht als Änderung und überschreiben so keine Bewertung von einem anderen Gerät.
+ */
+export function updateFilm(tmdbId: number, patch: Partial<Omit<Film, "tmdbId">>, { touch = true }: { touch?: boolean } = {}): Store {
   const store = load()
-  const next: Store = {
-    version: 1,
-    films: store.films.map((f) => (f.tmdbId === tmdbId ? { ...f, ...patch, tmdbId } : f)),
-  }
+  const stamp = touch ? { updatedAt: nowIso() } : {}
+  const next = withFilms(store, store.films.map((f) => (f.tmdbId === tmdbId ? { ...f, ...patch, ...stamp, tmdbId } : f)))
   save(next)
   return next
 }
 
 export function removeFilm(tmdbId: number): Store {
   const store = load()
-  const next: Store = { version: 1, films: store.films.filter((f) => f.tmdbId !== tmdbId) }
+  const next = withFilms(store, store.films.filter((f) => f.tmdbId !== tmdbId), { ...store.deleted, [tmdbId]: nowIso() })
   save(next)
   return next
 }
@@ -266,14 +319,22 @@ export async function importJson(file: File, mode: ImportMode = "merge"): Promis
     throw new Error("Die Datei ist kein gültiges JSON.")
   }
 
-  const incoming = validateStore(data)
+  // Importierte Filme gelten als gerade geändert – so setzen sie sich auch auf den anderen Geräten durch.
+  const now = nowIso()
+  const valid = validateStore(data)
+  const incoming: Store = { version: 1, films: valid.films.map((f) => ({ ...f, updatedAt: now })) }
+  const current = load()
 
   if (mode === "replace") {
-    save(incoming)
-    return { store: incoming, mode, added: incoming.films.length, updated: 0, total: incoming.films.length }
+    // Was nicht im Backup steht, ist gelöscht – auch auf den anderen Geräten.
+    const keep = new Set(incoming.films.map((f) => f.tmdbId))
+    const deleted = withoutDeleted(current.deleted, keep) ?? {}
+    for (const f of current.films) if (!keep.has(f.tmdbId)) deleted[f.tmdbId] = now
+    const next = withFilms(incoming, incoming.films, deleted)
+    save(next)
+    return { store: next, mode, added: incoming.films.length, updated: 0, total: incoming.films.length }
   }
 
-  const current = load()
   const incomingById = new Map(incoming.films.map((f) => [f.tmdbId, f]))
   let updated = 0
   const films = current.films.map((f) => {
@@ -286,7 +347,7 @@ export async function importJson(file: File, mode: ImportMode = "merge"): Promis
   const added = incomingById.size
   films.push(...incomingById.values())
 
-  const next: Store = { version: 1, films }
+  const next = withFilms(current, films, withoutDeleted(current.deleted, incoming.films.map((f) => f.tmdbId)))
   save(next)
   return { store: next, mode, added, updated, total: next.films.length }
 }
