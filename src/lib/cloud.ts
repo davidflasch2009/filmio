@@ -249,6 +249,12 @@ export async function pullRemote(): Promise<RemoteStore | null> {
   return rows[0] ? { data: rows[0].data, rev: Number(rows[0].rev) } : null
 }
 
+/** Nur die Revision vom Server (winzig) – um zu sehen, ob sich etwas geändert hat. null = noch nie gespeichert. */
+export async function remoteRev(): Promise<number | null> {
+  const rows = await authed<{ rev: number }[]>("/rest/v1/filmio_store?select=rev")
+  return rows[0] ? Number(rows[0].rev) : null
+}
+
 /** Speichert nur, wenn der Server noch auf Stand `rev` ist. Gibt die neue Revision zurück, sonst null (Konflikt). */
 export async function pushRemote(data: unknown, rev: number): Promise<number | null> {
   const r = await authed<number | null>("/rest/v1/rpc/filmio_save", { method: "POST", body: { p_data: data, p_rev: rev } })

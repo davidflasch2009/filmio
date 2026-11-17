@@ -3,7 +3,7 @@ import type { MyCinema, Service, Store } from "../types"
 import { exportJson, importJson, type ImportMode, type ImportResult } from "../lib/storage"
 import { GRID_SIZES, REGIONS, type Settings } from "../lib/settings"
 import { appVersion } from "../lib/updates"
-import { getSyncState, subscribeSync, syncNow, type SyncState } from "../lib/sync"
+import { forceSync, getSyncState, subscribeSync, type SyncState } from "../lib/sync"
 import tmdbLogo from "../assets/tmdb-logo.svg"
 import ViewHeader from "./ViewHeader"
 import { IconChart, IconCheck, IconInfo, IconList, IconTicket, IconChevronRight, IconDownload, IconLogout, IconSync, IconTv, IconUpload, IconUser } from "./Icons"
@@ -105,7 +105,7 @@ export default function MoreView({ store, account, onSignOut, onImported, settin
             <span className={`row-sub sync-${sync.status}`} role="status">{syncText(sync)}</span>
           </span>
         </div>
-        <button type="button" className="group-row row-button" onClick={() => void syncNow()} disabled={sync.status === "syncing"}>
+        <button type="button" className="group-row row-button" onClick={() => void forceSync()} disabled={sync.status === "syncing"}>
           <span className="row-icon"><IconSync /></span>
           <span className="row-text">Jetzt abgleichen</span>
         </button>

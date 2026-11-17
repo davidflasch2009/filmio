@@ -427,6 +427,8 @@ function FilmApp({ account, onSignOut }: { account: string; onSignOut: () => voi
             onRate={setRating}
             onOpenItem={openItem}
             onError={notify}
+            cinema={cinema}
+            programme={programme}
           />
         </div>
         <div hidden={tab !== "more"}>

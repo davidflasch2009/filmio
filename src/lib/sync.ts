@@ -5,7 +5,7 @@
 
 import type { Film, Store } from "../types"
 import { changedAt, load, onLocalChange, parseStore, save } from "./storage"
-import { CloudError, loadSession, pullRemote, pushRemote } from "./cloud"
+import { CloudError, loadSession, pullRemote, pushRemote, remoteRev } from "./cloud"
 
 // ---------------------------------------------------------------------------
 // Zusammenführen
@@ -113,7 +113,31 @@ export function subscribeSync(fn: () => void): () => void {
  * Hat ein anderes Gerät dazwischen gespeichert, wird mit dessen Stand neu zusammengeführt.
  * Gibt den neuen lokalen Store zurück, falls er sich geändert hat.
  */
+// Stand des letzten erfolgreichen Abgleichs: Server-Revision + ob es seitdem eigene Änderungen gab.
+const REV_KEY = "filmio.sync.rev"
+const DIRTY_KEY = "filmio.sync.dirty"
+const getItem = (k: string) => { try { return localStorage.getItem(k) } catch { return null } }
+const setItem = (k: string, v: string | null) => { try { if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v) } catch { /* egal */ } }
+const knownRev = (): number | null => { const v = getItem(REV_KEY); return v === null ? null : Number(v) }
+const isDirty = () => getItem(DIRTY_KEY) === "1"
+
 async function syncOnce(): Promise<Store | null> {
+  // Nichts Eigenes zu melden und der Server unverändert → fertig (nur eine winzige Abfrage).
+  if (!isDirty() && knownRev() !== null) {
+    const rev = await remoteRev()
+    if (rev === knownRev()) return null
+  }
+  // Ab hier gehören alle bisherigen eigenen Änderungen zu diesem Abgleich; neue setzen das Flag wieder.
+  setItem(DIRTY_KEY, null)
+  try {
+    return await mergeAndPush()
+  } catch (e) {
+    setItem(DIRTY_KEY, "1")
+    throw e
+  }
+}
+
+async function mergeAndPush(): Promise<Store | null> {
   for (let attempt = 0; attempt < 4; attempt++) {
     const remote = await pullRemote()
     const remoteStore = (remote && parseStore(remote.data)) ?? { version: 1 as const, films: [] }
@@ -124,9 +148,15 @@ async function syncOnce(): Promise<Store | null> {
     const localChanged = mergedPrint !== fingerprint(local)
     if (localChanged) save(merged, { silent: true })
 
-    if (remote && mergedPrint === fingerprint(remoteStore)) return localChanged ? merged : null
+    if (remote && mergedPrint === fingerprint(remoteStore)) {
+      setItem(REV_KEY, String(remote.rev))
+      return localChanged ? merged : null
+    }
     const rev = await pushRemote(merged, remote?.rev ?? 0)
-    if (rev !== null) return localChanged ? merged : null
+    if (rev !== null) {
+      setItem(REV_KEY, String(rev))
+      return localChanged ? merged : null
+    }
     // Konflikt: anderes Gerät war schneller → nochmal mit dessen Stand.
   }
   throw new CloudError("Der Abgleich ist mehrmals kollidiert. Bitte später noch einmal versuchen.", "server")
@@ -166,6 +196,12 @@ export function syncNow(): Promise<void> {
   return running
 }
 
+/** Vollständiger Abgleich (Knopf „Jetzt abgleichen“) – ohne Abkürzung über die Revision. */
+export function forceSync(): Promise<void> {
+  setItem(DIRTY_KEY, "1")
+  return syncNow()
+}
+
 let debounce: ReturnType<typeof setTimeout> | undefined
 
 /** Startet den automatischen Abgleich. Gibt eine Aufräum-Funktion zurück. */
@@ -173,17 +209,27 @@ export function startSync(handlers: { onRemoteChange: (store: Store) => void; on
   onRemoteChange = handlers.onRemoteChange
   onSignedOut = handlers.onSignedOut
 
-  // Eigene Änderung → kurz sammeln, dann hochladen.
+  // Eigene Änderung → merken und gleich hochladen (kurz gesammelt, falls mehrere zusammenkommen).
   const offChange = onLocalChange(() => {
+    setItem(DIRTY_KEY, "1")
     clearTimeout(debounce)
-    debounce = setTimeout(() => void syncNow(), 800)
+    debounce = setTimeout(() => void syncNow(), 300)
   })
-  const onVisible = () => { if (document.visibilityState === "visible") void syncNow() }
+  // Zurück in der App → nachsehen; App wird verlassen → Offenes sofort hochladen (sonst erst beim nächsten Öffnen).
+  const onVisible = () => {
+    if (document.visibilityState === "visible" || isDirty()) {
+      clearTimeout(debounce)
+      void syncNow()
+    }
+  }
+  const onHide = () => { if (isDirty()) void syncNow() }
+  window.addEventListener("pagehide", onHide)
   const onOnline = () => void syncNow()
   document.addEventListener("visibilitychange", onVisible)
   window.addEventListener("online", onOnline)
   // Solange die App offen ist, regelmäßig nach Änderungen von anderen Geräten schauen.
-  const interval = setInterval(() => { if (document.visibilityState === "visible") void syncNow() }, 60_000)
+  // Kostet fast nichts: meist nur die Revision.
+  const interval = setInterval(() => { if (document.visibilityState === "visible") void syncNow() }, 15_000)
 
   void syncNow()
 
@@ -193,6 +239,7 @@ export function startSync(handlers: { onRemoteChange: (store: Store) => void; on
     clearInterval(interval)
     document.removeEventListener("visibilitychange", onVisible)
     window.removeEventListener("online", onOnline)
+    window.removeEventListener("pagehide", onHide)
     onRemoteChange = null
     onSignedOut = null
   }
@@ -201,5 +248,6 @@ export function startSync(handlers: { onRemoteChange: (store: Store) => void; on
 /** Beim Abmelden: Zeitpunkt des letzten Abgleichs vergessen. */
 export function resetSyncState() {
   try { localStorage.removeItem(LAST_SYNC_KEY) } catch { /* egal */ }
+  setItem(REV_KEY, null)
   setState({ status: "idle", lastSync: null, error: null })
 }

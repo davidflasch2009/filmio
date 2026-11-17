@@ -1,3 +1,5 @@
+import type { MyCinema } from "../types"
+import type { CpxMovie } from "../lib/cineplexx"
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react"
 import type { Film } from "../types"
 import { hasToken, loadFilmInfo, searchMovies, yearFromDate, type TmdbListItem, type TmdbSearchResult } from "../lib/tmdb"
@@ -22,11 +24,13 @@ interface Props {
   onOpenItem: (item: TmdbListItem) => void
   /** Fehler bei Aktionen auf einem Treffer (als Toast, da die Karte weit unten sein kann). */
   onError: (message: string) => void
+  cinema: MyCinema | null
+  programme: CpxMovie[] | null
 }
 
 const DEBOUNCE_MS = 450
 
-export default function SearchView({ films, region, active, onAddToWatchlist, onRate, onOpenItem, onError }: Props) {
+export default function SearchView({ films, region, active, onAddToWatchlist, onRate, onOpenItem, onError, cinema, programme }: Props) {
   const online = useOnline()
   const [query, setQuery] = useState("")
   const [results, setResults] = useState<TmdbSearchResult[] | null>(null)
@@ -161,7 +165,7 @@ export default function SearchView({ films, region, active, onAddToWatchlist, on
 
       {/* Ohne Suchbegriff: Stöbern wie in einer Streaming-App. Bleibt eingehängt, damit Scroll-Positionen erhalten bleiben. */}
       <div hidden={query.trim() !== ""}>
-        <BrowseView films={films} region={region} active={active} onOpenItem={onOpenItem} />
+        <BrowseView films={films} region={region} active={active} cinema={cinema} programme={programme} onOpenItem={onOpenItem} />
       </div>
     </section>
   )
