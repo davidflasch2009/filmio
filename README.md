@@ -58,6 +58,17 @@ Einmalig einrichten:
 - Offline funktioniert alles weiter; abgeglichen wird, sobald wieder Internet da ist.
 - Projekt-URL und *Publishable Key* stehen in `src/lib/cloud.ts` (öffentlich gedacht; geschützt wird über Anmeldung + Row Level Security).
 
+## Mitteilungen (Web Push)
+
+- Die App meldet das Gerät in `filmio_push` an (Endpoint + Schlüssel + Land), siehe [`supabase/push.sql`](supabase/push.sql).
+- Die Edge Function [`supabase/functions/filmio-notify`](supabase/functions/filmio-notify) läuft täglich um 16:17 UTC (pg_cron + pg_net),
+  fragt TMDB nach Anbietern und Kinostarts der Watchlist-Filme und verschickt neue Meldungen.
+  Beim ersten Lauf wird nur der Stand gemerkt (keine Flut). Abgemeldete Geräte (404/410) werden gelöscht.
+- Verschlüsselung (RFC 8291) und VAPID (RFC 8292) ohne Bibliothek in `webpush.ts`.
+- Secrets in Supabase: `FILMIO_VAPID_PUBLIC`, `FILMIO_VAPID_PRIVATE_JWK`, `FILMIO_CRON_SECRET` (nicht im Repo).
+  Der öffentliche VAPID-Schlüssel steht in `src/lib/push.ts`.
+- Auf dem iPhone nur, wenn filmio auf dem Home-Bildschirm liegt (iOS 16.4+).
+
 ## Daten & Backup
 
 - Gespeichert wird in `localStorage` unter dem Schlüssel `filmio.v1` (`{ version: 1, films: [...] }`).
@@ -98,6 +109,12 @@ src/
 - **Meine Streaming-Dienste** (unter Mehr, auf allen Geräten gleich): Logos auf den Watchlist-Postern, Filter „Läuft bei mir“,
   Hervorhebung auf der Detailseite
 - **Würfel** auf der Watchlist, filterbar nach Genre, „Unter 2 Std.“ und „Läuft bei mir“ (ohne Filme, die noch nicht draußen sind)
+- **Eigene Listen** (z.B. „Weihnachten“): auf der Detailseite „+ Liste“, Filter „Liste“ in Gesehen und Watchlist,
+  Übersicht unter Mehr → Meine Listen (umbenennen, löschen)
+- **Jahresrückblick** in der Statistik: Story zum Durchtippen (Filme, Stunden, stärkster Monat, Lieblingsgenre,
+  Film des Jahres, Top 5, Lieblingsschauspieler, mehrfach gesehen); zählt nur datierte Filmabende
+- **Mitteilungen** (Mehr → Mitteilungen): einmal am Tag, wenn ein Watchlist-Film neu bei deinen Diensten läuft
+  oder im gewählten Land ins Kino kommt; Antippen öffnet den Film
 - **Mehrfach gesehen**: „Nochmal gesehen“ auf der Detailseite, Daten änderbar; zählt in Statistik und „Zuletzt gesehen“
 - **Statistik** unter Mehr: Anzahl, Stunden, Schnitt, Sterne-Verteilung, beste Filme, Lieblingsgenres, Jahrzehnte, häufigste Ja-Antworten
 

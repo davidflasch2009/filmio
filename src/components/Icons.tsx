@@ -87,3 +87,9 @@ export const IconRepeat = (p: IconProps) => (
 export const IconCalendar = (p: IconProps) => (
   <Svg {...p}><rect x="4" y="5.5" width="16" height="14.5" rx="2.5" /><path d="M4 10h16M8.5 3.5v4M15.5 3.5v4" /></Svg>
 )
+export const IconList = (p: IconProps) => (
+  <Svg {...p}><path d="M9 6.5h11M9 12h11M9 17.5h11" /><circle cx="4.75" cy="6.5" r="1" /><circle cx="4.75" cy="12" r="1" /><circle cx="4.75" cy="17.5" r="1" /></Svg>
+)
+export const IconBell = (p: IconProps) => (
+  <Svg {...p}><path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2h-15z" /><path d="M10 20.5a2.2 2.2 0 0 0 4 0" /></Svg>
+)

@@ -9,6 +9,11 @@ const headers = {
   accept: "application/json",
 }
 
+/** Für die tägliche Prüfung auf dem eigenen Server – derselbe Token, der ohnehin in der App steckt. */
+export function tmdbTokenForServer(): string {
+  return TOKEN.trim()
+}
+
 /** false, wenn beim Build kein VITE_TMDB_TOKEN gesetzt war. */
 export const hasToken = TOKEN.trim() !== ""
 

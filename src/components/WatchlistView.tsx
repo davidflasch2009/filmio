@@ -3,6 +3,7 @@ import type { Film, RegionCode, Service } from "../types"
 import { formatUpcomingShort, todayStamp, upcomingRelease, type Upcoming } from "../lib/release"
 import { smallImageUrl } from "../lib/tmdb"
 import FilmCard from "./FilmCard"
+import FilterChip from "./FilterChip"
 import ViewHeader from "./ViewHeader"
 import { IconCheck, IconDice, IconFlagFilled, IconTv } from "./Icons"
 
@@ -27,10 +28,11 @@ function serviceLogos(list: Service[] | undefined) {
 
 export default function WatchlistView({ films, region, services, streams, onOpen, onMarkWatched, onFindFilms, onRandom, onOpenServices }: Props) {
   const [streamOnly, setStreamOnly] = useState(false)
+  const [tag, setTag] = useState("")
 
   const { available, upcoming, total } = useMemo(() => {
     const today = todayStamp()
-    const all = films.filter((f) => f.status === "watchlist")
+    const all = films.filter((f) => f.status === "watchlist" && (!tag || (f.tags ?? []).includes(tag)))
     const available: Film[] = []
     const upcoming: { film: Film; when: Upcoming }[] = []
     for (const f of all) {
@@ -43,7 +45,12 @@ export default function WatchlistView({ films, region, services, streams, onOpen
     // Nächster Termin zuerst, offene Termine ans Ende.
     upcoming.sort((a, b) => (a.when.date ?? "9999").localeCompare(b.when.date ?? "9999") || a.film.title.localeCompare(b.film.title, "de"))
     return { available, upcoming, total: all.length }
-  }, [films, region])
+  }, [films, region, tag])
+  const tags = useMemo(
+    () => [...new Set(films.filter((f) => f.status === "watchlist").flatMap((f) => f.tags ?? []))].sort((a, b) => a.localeCompare(b, "de")),
+    [films],
+  )
+  if (tag && !tags.includes(tag)) setTag("")
 
   const filterOn = streamOnly && services.length > 0
   const shown = filterOn ? available.filter((f) => (streams.get(f.tmdbId)?.length ?? 0) > 0) : available
@@ -65,8 +72,19 @@ export default function WatchlistView({ films, region, services, streams, onOpen
           </button>
         )}
       >
-        {available.length > 0 && (
+        {(available.length > 0 || tag !== "") && (
           <div className="chips">
+            {tags.length > 0 && (
+              <FilterChip
+                id="watchlist-tag"
+                label="Liste"
+                options={[{ value: "", label: "Alle Listen" }, ...tags.map((t) => ({ value: t, label: t }))]}
+                value={tag}
+                onChange={setTag}
+                active={tag !== ""}
+                idleLabel="Liste"
+              />
+            )}
             <button
               type="button"
               className={`chip chip-toggle${filterOn ? " chip-active" : ""}`}

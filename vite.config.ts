@@ -30,6 +30,8 @@ export default defineConfig({
         ]
       },
       workbox: {
+        // Empfang und Antippen von Mitteilungen (public/push-sw.js).
+        importScripts: ['push-sw.js'],
         runtimeCaching: [
           {
             // Filmdetails, Filmreihen und Stöber-Listen: online immer frisch, offline die zuletzt geladene Fassung.

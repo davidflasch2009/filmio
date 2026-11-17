@@ -95,6 +95,8 @@ function checkFilm(x: unknown): FilmCheck {
   if (!(f.backdropPath === undefined || isNullableString(f.backdropPath))) return fail("backdropPath", "Text oder null")
   if (!(f.updatedAt === undefined || isIsoDate(f.updatedAt))) return fail("updatedAt", "ISO-Datum")
   if (!(f.priority === undefined || typeof f.priority === "boolean")) return fail("priority", "true/false")
+  if (!(f.tags === undefined || (Array.isArray(f.tags) && f.tags.every((t) => typeof t === "string"))))
+    return fail("tags", "Liste von Texten")
   if (!(f.rewatches === undefined || (Array.isArray(f.rewatches) && f.rewatches.every(isIsoDate))))
     return fail("rewatches", "Liste von ISO-Daten")
   // Kaputte Termine sind kein Grund, den Film abzulehnen – sie werden neu geholt.
@@ -123,8 +125,22 @@ function checkFilm(x: unknown): FilmCheck {
       ...(release ? { release } : {}),
       ...(f.priority ? { priority: true } : {}),
       ...(Array.isArray(f.rewatches) && f.rewatches.length ? { rewatches: [...(f.rewatches as string[])] } : {}),
+      ...(Array.isArray(f.tags) && f.tags.length ? { tags: cleanTags(f.tags as string[]) } : {}),
     },
   }
+}
+
+/** Listen-Namen: getrimmt, ohne Leere und Doppelte (Groß/klein egal). */
+export function cleanTags(tags: string[]): string[] {
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const raw of tags) {
+    const t = raw.trim().replace(/\s+/g, " ").slice(0, 40)
+    if (!t || seen.has(t.toLocaleLowerCase("de"))) continue
+    seen.add(t.toLocaleLowerCase("de"))
+    out.push(t)
+  }
+  return out
 }
 
 /** Lösch-Marker (tmdbId → ISO-Datum); ungültige Einträge werden still verworfen. */
@@ -299,6 +315,18 @@ export function updateFilm(tmdbId: number, patch: Partial<Omit<Film, "tmdbId">>,
   const store = load()
   const stamp = touch ? { updatedAt: nowIso() } : {}
   const next = withFilms(store, store.films.map((f) => (f.tmdbId === tmdbId ? { ...f, ...patch, ...stamp, tmdbId } : f)))
+  save(next)
+  return next
+}
+
+/** Ändert mehrere Filme auf einmal (z.B. eine Liste umbenennen). fn gibt null zurück = Film bleibt unverändert. */
+export function updateMany(fn: (film: Film) => Partial<Omit<Film, "tmdbId">> | null): Store {
+  const store = load()
+  const now = nowIso()
+  const next = withFilms(store, store.films.map((f) => {
+    const patch = fn(f)
+    return patch ? { ...f, ...patch, updatedAt: now, tmdbId: f.tmdbId } : f
+  }))
   save(next)
   return next
 }

@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 import type { Film, Service, Store } from "./types"
-import { addFilm, load, newFilm, removeFilm, setServices, STORAGE_KEY, updateFilm, type ImportResult } from "./lib/storage"
+import { addFilm, cleanTags, load, newFilm, removeFilm, setServices, STORAGE_KEY, updateFilm, updateMany, type ImportResult } from "./lib/storage"
 import { formatRating } from "./lib/format"
 import { fetchFilmMeta, hasToken, listItemToInfo, type TmdbListItem } from "./lib/tmdb"
 import { releaseNeedsRefresh, upcomingRelease } from "./lib/release"
 import { useStreams } from "./hooks/useStreams"
 import ServicesPicker from "./components/ServicesPicker"
+import ListsView from "./components/ListsView"
 import { useOnline } from "./hooks/useOnline"
 import { loadSettings, saveSettings, type Settings } from "./lib/settings"
 import TabBar, { type Tab } from "./components/TabBar"
@@ -25,6 +26,28 @@ import { resetSyncState, startSync } from "./lib/sync"
 /** Zeitstempel für neue Einträge (außerhalb der Komponente, damit klar ist: nur in Ereignissen benutzt). */
 const nowIso = () => new Date().toISOString()
 const nowMs = () => Date.now()
+
+/** Ziel aus einer Mitteilung: ?film=123 öffnet den Film, ?tab=watchlist die Watchlist. */
+interface DeepLink { film: number | null; tab: Tab | null }
+
+function parseLink(href: string): DeepLink | null {
+  const u = new URL(href, window.location.href)
+  const film = Number(u.searchParams.get("film")) || null
+  const tab = u.searchParams.get("tab") === "watchlist" ? "watchlist" : null
+  return film || tab ? { film, tab } : null
+}
+
+/** Beim Start aus einer Mitteilung: Ziel merken und die Adresse wieder aufräumen. */
+const START_LINK = (() => {
+  const link = parseLink(window.location.href)
+  if (link) window.history.replaceState(null, "", window.location.pathname)
+  return link
+})()
+
+/** Tab, in dem ein gespeicherter Film steht. */
+function tabOf(film: Film): Tab {
+  return film.status === "watchlist" ? "watchlist" : film.rating === null ? "earlier" : "watched"
+}
 
 /** Eine geöffnete Detailseite. Von dort aus geöffnete Filme (Filmreihe, Empfehlungen) liegen als Stapel darüber. */
 interface DetailEntry {
@@ -57,10 +80,14 @@ export default function App() {
 
 function FilmApp({ account, onSignOut }: { account: string; onSignOut: () => void }) {
   const [store, setStore] = useState<Store>(load)
-  const [tab, setTab] = useState<Tab>("watched")
+  const [tab, setTab] = useState<Tab>(() => {
+    const saved = START_LINK?.film ? load().films.find((f) => f.tmdbId === START_LINK.film) : undefined
+    return saved ? tabOf(saved) : START_LINK?.tab ?? "watched"
+  })
   const [settings, setSettings] = useState(loadSettings)
   /** Stapel der geöffneten Detailseiten; die oberste wird angezeigt. */
-  const [details, setDetails] = useState<DetailEntry[]>([])
+  const [details, setDetails] = useState<DetailEntry[]>(() =>
+    START_LINK?.film && load().films.some((f) => f.tmdbId === START_LINK.film) ? [{ tmdbId: START_LINK.film, draft: null, instant: true }] : [])
   const detailRef = useRef<HTMLDivElement>(null)
   const [statsOpen, setStatsOpen] = useState(false)
   /** Film, der gerade bewertet wird. */
@@ -78,6 +105,33 @@ function FilmApp({ account, onSignOut }: { account: string; onSignOut: () => voi
     }
     window.addEventListener("storage", onStorage)
     return () => window.removeEventListener("storage", onStorage)
+  }, [])
+
+  // Mitteilung angetippt, während die App schon offen war.
+  useEffect(() => {
+    const sw = navigator.serviceWorker
+    if (!sw) return
+    const onMessage = (e: MessageEvent) => {
+      const data = e.data as { type?: string; url?: string } | null
+      if (data?.type !== "filmio-open" || !data.url) return
+      const link = parseLink(data.url)
+      if (!link) return
+      setRating(null)
+      setPicking(false)
+      setStatsOpen(false)
+      setServicesOpen(false)
+      setListsOpen(false)
+      const saved = link.film ? load().films.find((f) => f.tmdbId === link.film) : undefined
+      if (saved) {
+        setTab(tabOf(saved))
+        setDetails([{ tmdbId: saved.tmdbId, draft: null }])
+      } else {
+        setDetails([])
+        if (link.tab) setTab(link.tab)
+      }
+    }
+    sw.addEventListener("message", onMessage)
+    return () => sw.removeEventListener("message", onMessage)
   }, [])
 
   // Abgleich mit den anderen Geräten. Übernommene Änderungen frisch aus dem Speicher lesen –
@@ -118,6 +172,7 @@ function FilmApp({ account, onSignOut }: { account: string; onSignOut: () => voi
   const services = useMemo<Service[]>(() => store.services?.list ?? [], [store.services])
   const streams = useStreams(store.films, services, region, online)
   const [servicesOpen, setServicesOpen] = useState(false)
+  const [listsOpen, setListsOpen] = useState(false)
 
   useEffect(() => {
     if (!toast) return
@@ -125,7 +180,7 @@ function FilmApp({ account, onSignOut }: { account: string; onSignOut: () => voi
     return () => clearTimeout(t)
   }, [toast])
 
-  const overlayOpen = details.length > 0 || rating !== null || picking || statsOpen || servicesOpen
+  const overlayOpen = details.length > 0 || rating !== null || picking || statsOpen || servicesOpen || listsOpen
   useEffect(() => {
     document.body.classList.toggle("no-scroll", overlayOpen)
   }, [overlayOpen])
@@ -258,6 +313,23 @@ function FilmApp({ account, onSignOut }: { account: string; onSignOut: () => voi
     }
   }
 
+  function setTags(film: Film, tags: string[]) {
+    const clean = cleanTags(tags)
+    persist(() => updateFilm(film.tmdbId, { tags: clean.length ? clean : undefined }))
+  }
+
+  /** Liste umbenennen – heißt eine andere schon so, werden beide zusammengelegt. */
+  function renameTag(from: string, to: string) {
+    persist(() => updateMany((f) => (f.tags?.includes(from) ? { tags: cleanTags(f.tags.map((t) => (t === from ? to : t))) } : null)))
+  }
+
+  function deleteTag(tag: string) {
+    const without = (tags: string[]) => { const rest = tags.filter((t) => t !== tag); return rest.length ? rest : undefined }
+    if (persist(() => updateMany((f) => (f.tags?.includes(tag) ? { tags: without(f.tags) } : null)))) {
+      notify(`Liste „${tag}“ gelöscht`)
+    }
+  }
+
   function changeServices(list: Service[]) {
     persist(() => setServices(list))
   }
@@ -356,6 +428,7 @@ function FilmApp({ account, onSignOut }: { account: string; onSignOut: () => voi
             onOpenStats={() => setStatsOpen(true)}
             services={services}
             onOpenServices={() => setServicesOpen(true)}
+            onOpenLists={() => setListsOpen(true)}
           />
         </div>
       </main>
@@ -363,6 +436,10 @@ function FilmApp({ account, onSignOut }: { account: string; onSignOut: () => voi
       <TabBar active={tab} onChange={changeTab} />
 
       {statsOpen && <StatsView films={store.films} onClose={() => setStatsOpen(false)} onOpen={openSaved} />}
+
+      {listsOpen && (
+        <ListsView films={store.films} onOpen={openSaved} onRename={renameTag} onDelete={deleteTag} onClose={() => setListsOpen(false)} />
+      )}
 
       {servicesOpen && (
         <ServicesPicker selected={services} region={region} onChange={changeServices} onClose={() => setServicesOpen(false)} />
@@ -391,6 +468,7 @@ function FilmApp({ account, onSignOut }: { account: string; onSignOut: () => voi
           onSaveWithoutRating={saveWithoutRating}
           onTogglePriority={togglePriority}
           onSetRewatches={setRewatches}
+          onSetTags={setTags}
         />
       )}
 

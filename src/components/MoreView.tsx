@@ -6,8 +6,9 @@ import { appVersion } from "../lib/updates"
 import { getSyncState, subscribeSync, syncNow, type SyncState } from "../lib/sync"
 import tmdbLogo from "../assets/tmdb-logo.svg"
 import ViewHeader from "./ViewHeader"
-import { IconChart, IconCheck, IconChevronRight, IconDownload, IconLogout, IconSync, IconTv, IconUpload, IconUser } from "./Icons"
+import { IconChart, IconCheck, IconList, IconChevronRight, IconDownload, IconLogout, IconSync, IconTv, IconUpload, IconUser } from "./Icons"
 import { smallImageUrl } from "../lib/tmdb"
+import NotificationSettings from "./NotificationSettings"
 
 interface Props {
   store: Store
@@ -19,6 +20,7 @@ interface Props {
   onOpenStats: () => void
   services: Service[]
   onOpenServices: () => void
+  onOpenLists: () => void
 }
 
 type Message = { kind: "ok" | "error"; text: string }
@@ -35,7 +37,7 @@ function syncText(state: SyncState): string {
   return `Abgeglichen · ${time}`
 }
 
-export default function MoreView({ store, account, onSignOut, onImported, settings, onSettingsChange, onOpenStats, services, onOpenServices }: Props) {
+export default function MoreView({ store, account, onSignOut, onImported, settings, onSettingsChange, onOpenStats, services, onOpenServices, onOpenLists }: Props) {
   const { gridSize, region } = settings
   const fileRef = useRef<HTMLInputElement>(null)
   const [file, setFile] = useState<File | null>(null)
@@ -46,6 +48,7 @@ export default function MoreView({ store, account, onSignOut, onImported, settin
 
   const watched = store.films.filter((f) => f.status === "watched").length
   const watchlist = store.films.length - watched
+  const tagCount = new Set(store.films.flatMap((f) => f.tags ?? [])).size
 
   function onExport() {
     try {
@@ -116,6 +119,14 @@ export default function MoreView({ store, account, onSignOut, onImported, settin
           <span className="row-text">Statistik</span>
           <IconChevronRight className="row-chevron" />
         </button>
+        <button type="button" className="group-row row-button" onClick={onOpenLists}>
+          <span className="row-icon"><IconList /></span>
+          <span className="row-text">
+            Meine Listen
+            {tagCount > 0 && <span className="row-sub">{tagCount === 1 ? "1 Liste" : `${tagCount} Listen`}</span>}
+          </span>
+          <IconChevronRight className="row-chevron" />
+        </button>
         <button type="button" className="group-row row-button" onClick={onOpenServices}>
           <span className="row-icon"><IconTv /></span>
           <span className="row-text">
@@ -130,6 +141,8 @@ export default function MoreView({ store, account, onSignOut, onImported, settin
           <IconChevronRight className="row-chevron" />
         </button>
       </div>
+
+      <NotificationSettings region={region} hasServices={services.length > 0} onOpenServices={onOpenServices} />
 
       <h2 className="group-label">Darstellung</h2>
       <div className="group">

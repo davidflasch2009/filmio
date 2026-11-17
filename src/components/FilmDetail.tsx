@@ -13,6 +13,7 @@ import { useOnline } from "../hooks/useOnline"
 import { useSwipeBack } from "../hooks/useSwipeBack"
 import StarRating from "./StarRating"
 import PosterRow from "./PosterRow"
+import TagEditor from "./TagEditor"
 import {
   IconBookmark, IconCalendar, IconCheck, IconChevronLeft, IconFlag, IconFlagFilled, IconHistory, IconMinus, IconPlay, IconPlus, IconRepeat, IconTrash, IconX,
 } from "./Icons"
@@ -46,6 +47,7 @@ interface Props {
   onTogglePriority: (film: Film) => void
   /** Weitere Male gesehen: neue Liste der Daten (ISO). */
   onSetRewatches: (film: Film, rewatches: string[]) => void
+  onSetTags: (film: Film, tags: string[]) => void
 }
 
 /** "2026-11-17" → ISO um 12 Uhr Ortszeit (damit das Datum in keiner Zeitzone kippt). */
@@ -113,7 +115,7 @@ function Portrait({ path, name }: { path: string | null; name: string }) {
 export default function FilmDetail({
   film, saved, instant = false, initialScroll = 0, scrollerRef, region, services, films,
   onClose, onRate, onAddToWatchlist, onAddManyToWatchlist, onMoveToWatchlist, onDelete, onSaveNote, onSetFromNotes,
-  onSaveWithoutRating, onOpenItem, onTogglePriority, onSetRewatches,
+  onSaveWithoutRating, onOpenItem, onTogglePriority, onSetRewatches, onSetTags,
 }: Props) {
   const online = useOnline()
   useSwipeBack(scrollerRef, onClose)
@@ -175,6 +177,7 @@ export default function FilmDetail({
   const upcoming = film.status === "watched" && saved ? null
     : upcomingRelease({ release: film.release ?? full?.info.release, year: view.year }, region)
   const rewatches = film.rewatches ?? []
+  const allTags = [...new Set(films.flatMap((f) => f.tags ?? []))].sort((a, b) => a.localeCompare(b, "de"))
   const regionLabel = REGIONS.find((r) => r.id === region)?.label ?? region
   const longOverview = view.overview.length > 320
 
@@ -346,6 +349,13 @@ export default function FilmDetail({
               </button>
               {noteSaved && note.trim() === film.note && <span className="hint">Gespeichert ✓</span>}
             </div>
+          </section>
+        )}
+
+        {saved && (
+          <section className="detail-section">
+            <h3>Listen</h3>
+            <TagEditor tags={film.tags ?? []} allTags={allTags} onChange={(tags) => onSetTags(film, tags)} />
           </section>
         )}
 

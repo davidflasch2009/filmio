@@ -106,7 +106,7 @@ function errorMessage(status: number, body: unknown): string {
   return `Unerwartete Antwort vom Server (${status}).`
 }
 
-async function request<T>(path: string, init: { method?: string; body?: unknown; token?: string } = {}): Promise<T> {
+async function request<T>(path: string, init: { method?: string; body?: unknown; token?: string; prefer?: string } = {}): Promise<T> {
   let res: Response
   try {
     res = await fetch(BASE + path, {
@@ -115,6 +115,7 @@ async function request<T>(path: string, init: { method?: string; body?: unknown;
         apikey: KEY,
         "content-type": "application/json",
         ...(init.token ? { authorization: `Bearer ${init.token}` } : {}),
+        ...(init.prefer ? { prefer: init.prefer } : {}),
       },
       body: init.body === undefined ? undefined : JSON.stringify(init.body),
     })
@@ -224,7 +225,7 @@ async function token(force = false): Promise<string> {
 }
 
 /** Aufruf mit Anmeldung; bei 401 einmal mit erneuertem Token wiederholen. */
-async function authed<T>(path: string, init: { method?: string; body?: unknown } = {}): Promise<T> {
+async function authed<T>(path: string, init: { method?: string; body?: unknown; prefer?: string } = {}): Promise<T> {
   try {
     return await request<T>(path, { ...init, token: await token() })
   } catch (e) {
@@ -252,4 +253,34 @@ export async function pullRemote(): Promise<RemoteStore | null> {
 export async function pushRemote(data: unknown, rev: number): Promise<number | null> {
   const r = await authed<number | null>("/rest/v1/rpc/filmio_save", { method: "POST", body: { p_data: data, p_rev: rev } })
   return r === null ? null : Number(r)
+}
+
+// ---------------------------------------------------------------------------
+// Benachrichtigungen
+// ---------------------------------------------------------------------------
+
+export interface PushRow { endpoint: string; p256dh: string; auth: string; region: string }
+
+/** Gerät für Mitteilungen anmelden (oder Land aktualisieren). */
+export async function savePushSubscription(row: PushRow): Promise<void> {
+  await authed("/rest/v1/filmio_push?on_conflict=endpoint", {
+    method: "POST",
+    body: row,
+    prefer: "resolution=merge-duplicates,return=minimal",
+  })
+}
+
+export async function deletePushSubscription(endpoint: string): Promise<void> {
+  await authed(`/rest/v1/filmio_push?endpoint=eq.${encodeURIComponent(endpoint)}`, { method: "DELETE", prefer: "return=minimal" })
+}
+
+/** Die tägliche Prüfung auf dem Server fragt TMDB mit demselben Token wie die App. */
+export async function shareTmdbToken(token: string): Promise<void> {
+  if (!token) return
+  await authed("/rest/v1/rpc/filmio_set_tmdb_token", { method: "POST", body: { p_token: token } })
+}
+
+/** Test-Mitteilung an dieses Gerät. */
+export async function sendTestPush(endpoint: string): Promise<void> {
+  await authed("/functions/v1/filmio-notify", { method: "POST", body: { mode: "test", endpoint } })
 }

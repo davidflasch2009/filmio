@@ -40,6 +40,8 @@ export default function WatchedView({ films, onOpen, onFindFilms }: Props) {
   const [query, setQuery] = useState("")
   /** Nur Filme zeigen, deren Bewertung aus den eigenen Notizen stammt. */
   const [notesOnly, setNotesOnly] = useState(false)
+  /** Eigene Liste („“ = alle). */
+  const [tag, setTag] = useState("")
 
   // Gesehene Filme ohne Bewertung stehen im Tab „Früher“.
   const watched = useMemo(() => films.filter((f) => f.status === "watched" && f.rating !== null), [films])
@@ -60,6 +62,7 @@ export default function WatchedView({ films, onOpen, onFindFilms }: Props) {
       (!genre || f.genres.includes(genre)) &&
       (f.rating ?? 0) >= minRating &&
       (!notesOnly || f.fromNotes) &&
+      (!tag || (f.tags ?? []).includes(tag)) &&
       (!q || normalizeText(f.title).includes(q) || normalizeText(f.note).includes(q)))
 
     const sorted = [...list]
@@ -82,18 +85,22 @@ export default function WatchedView({ films, onOpen, onFindFilms }: Props) {
         break
     }
     return sorted
-  }, [watched, sort, genre, minRating, query, notesOnly])
+  }, [watched, sort, genre, minRating, query, notesOnly, tag])
+  const tags = useMemo(() => [...new Set(watched.flatMap((f) => f.tags ?? []))].sort((a, b) => a.localeCompare(b, "de")), [watched])
+  // Liste gibt es nicht mehr (umbenannt/gelöscht) → Filter lösen.
+  if (tag && !tags.includes(tag)) setTag("")
   const notesCount = watched.filter((f) => f.fromNotes).length
   // Gibt es keine solchen Filme mehr, verschwindet der Umschalter – dann darf der Filter nicht hängen bleiben.
   if (notesOnly && notesCount === 0) setNotesOnly(false)
 
-  const filtered = genre !== "" || minRating !== 0 || query.trim() !== "" || notesOnly
+  const filtered = genre !== "" || minRating !== 0 || query.trim() !== "" || notesOnly || tag !== ""
 
   function resetFilters() {
     setGenre("")
     setMinRating(0)
     setQuery("")
     setNotesOnly(false)
+    setTag("")
   }
 
   return (
@@ -114,6 +121,17 @@ export default function WatchedView({ films, onOpen, onFindFilms }: Props) {
                 idleLabel="Genre"
               />
               <FilterChip id="watched-rating" label="Bewertung" options={minOptions} value={minRating} onChange={setMinRating} active={minRating !== 0} idleLabel="Sterne" />
+              {tags.length > 0 && (
+                <FilterChip
+                  id="watched-tag"
+                  label="Liste"
+                  options={[{ value: "", label: "Alle Listen" }, ...tags.map((t) => ({ value: t, label: t }))]}
+                  value={tag}
+                  onChange={setTag}
+                  active={tag !== ""}
+                  idleLabel="Liste"
+                />
+              )}
               {notesCount > 0 && (
                 <button
                   type="button"

@@ -1,11 +1,13 @@
-import { useMemo, useRef, type ReactNode } from "react"
+import { useMemo, useRef, useState, type ReactNode } from "react"
 import type { Film } from "../types"
 import { QUESTIONS } from "../lib/scoring"
 import { formatRating } from "../lib/format"
 import type { TmdbListItem } from "../lib/tmdb"
 import { useSwipeBack } from "../hooks/useSwipeBack"
 import PosterRow from "./PosterRow"
-import { IconChevronLeft } from "./Icons"
+import YearRecap from "./YearRecap"
+import { buildRecap, recapYears } from "../lib/recap"
+import { IconChevronLeft, IconChevronRight } from "./Icons"
 
 interface Props {
   films: Film[]
@@ -144,9 +146,19 @@ export default function StatsView({ films, onClose, onOpen }: Props) {
     return { watched, rated, watchlist, average, mostWatched, totalViewings, stars, genres, decades, questions, answeredCount: answered.length, best }
   }, [films])
 
+  const years = useMemo(() => recapYears(films), [films])
+  const [recapYear, setRecapYear] = useState<number | null>(null)
+  const [entryYear, setEntryYear] = useState<number | null>(null)
+  const shownYear = entryYear !== null && years.includes(entryYear) ? entryYear : years[0]
+  const entry = shownYear !== undefined ? buildRecap(films, shownYear) : null
+
   const bestItems: TmdbListItem[] = stats.best.map((f) => ({ id: f.tmdbId, title: f.title, poster_path: f.posterPath }))
 
   return (
+    <>
+    {recapYear !== null && (
+      <YearRecap films={films} year={recapYear} onClose={() => setRecapYear(null)} onOpen={(f) => { setRecapYear(null); onOpen(f) }} />
+    )}
     <div className="overlay stats detail-enter" role="dialog" aria-modal="true" aria-label="Statistik" ref={ref}>
       <header className="stats-head">
         <button type="button" className="round-btn" onClick={onClose} aria-label="Zurück"><IconChevronLeft /></button>
@@ -157,6 +169,27 @@ export default function StatsView({ films, onClose, onOpen }: Props) {
         <p className="empty">Sobald du Filme als gesehen einträgst, erscheint hier deine Statistik.</p>
       ) : (
         <div className="stats-body">
+          {entry && (
+            <>
+              <button type="button" className="recap-entry" onClick={() => setRecapYear(entry.year)}>
+                <span className="recap-entry-year">{entry.year}</span>
+                <span className="recap-entry-text">
+                  <strong>Jahresrückblick</strong>
+                  <span>{entry.films.length === 1 ? "1 Film" : `${entry.films.length} Filme`} – deine Highlights zum Durchtippen</span>
+                </span>
+                <IconChevronRight className="row-chevron" />
+              </button>
+              {years.length > 1 && (
+                <div className="recap-years" role="group" aria-label="Jahr wählen">
+                  {years.map((y) => (
+                    <button key={y} type="button" className={`chip chip-toggle${y === entry.year ? " chip-active" : ""}`} aria-pressed={y === entry.year} onClick={() => setEntryYear(y)}>
+                      <span className="chip-text">{y}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
           <div className="stat-row">
             <StatTile label="Filme gesehen" value={String(stats.watched.length)} />
             <StatTile label="Stunden geschaut" value={hours(stats.watched).toLocaleString("de-DE")} />
@@ -219,5 +252,6 @@ export default function StatsView({ films, onClose, onOpen }: Props) {
         </div>
       )}
     </div>
+    </>
   )
 }

@@ -21,6 +21,7 @@ export interface Film {
   release?: ReleaseInfo           // Erscheinungstermine; fehlt = noch nicht von TMDB geholt
   priority?: boolean              // Watchlist: „unbedingt bald“ – steht oben
   rewatches?: string[]            // weitere Male gesehen (ISO-Datum), zusätzlich zu watchedAt
+  tags?: string[]                 // eigene Listen, z.B. „Weihnachten“
 }
 
 export type RegionCode = "DE" | "AT" | "CH"
