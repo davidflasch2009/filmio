@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState, type ReactNode } from "react"
 import type { Answer, Film } from "../types"
-import { QUESTIONS, scoreFromAnswers } from "../lib/scoring"
+import { QUESTION_HELP, QUESTIONS, scoreFromAnswers } from "../lib/scoring"
 import { formatRating } from "../lib/format"
 import { starFillPercent } from "../lib/stars"
 import { backdropUrl, posterUrl } from "../lib/tmdb"
 import StarRating from "./StarRating"
-import { IconCheck, IconChevronLeft, IconMinus, IconX } from "./Icons"
+import { IconCheck, IconChevronLeft, IconInfo, IconMinus, IconX } from "./Icons"
 
 export interface RatingResult {
   answers: Answer[]
@@ -120,6 +120,8 @@ export default function RatingFlow({ film, onCancel, onSave, onSaveWithoutRating
   const [step, setStep] = useState(0)
   const [answers, setAnswers] = useState<(Answer | undefined)[]>(() => Array(total).fill(undefined))
   const [result, setResult] = useState<RatingResult | null>(null)
+  /** Erklärung zur Frage offen – bleibt für die nächsten Fragen offen, bis man sie zuklappt. */
+  const [help, setHelp] = useState(false)
   const lockUntil = useRef(0)
   const headingRef = useRef<HTMLHeadingElement>(null)
 
@@ -173,6 +175,17 @@ export default function RatingFlow({ film, onCancel, onSave, onSaveWithoutRating
           <section className="question">
             <p className="question-count" aria-live="polite">Frage {step + 1} von {total}</p>
             <h2 className="question-text" ref={headingRef} tabIndex={-1}>{QUESTIONS[step]}</h2>
+            <button
+              type="button"
+              className={`question-info${help ? " open" : ""}`}
+              aria-expanded={help}
+              aria-controls="question-help"
+              aria-label={help ? "Erklärung ausblenden" : "Frage erklären"}
+              onClick={() => setHelp((h) => !h)}
+            >
+              <IconInfo />
+            </button>
+            <p id="question-help" className="question-help" hidden={!help}>{QUESTION_HELP[step]}</p>
             <div className="answer-row">
               {OPTIONS.map((o) => (
                 <button

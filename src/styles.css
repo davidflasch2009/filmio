@@ -346,8 +346,26 @@ div.card-main { cursor: default; }
 .question-count { margin-top: auto; color: rgba(255,255,255,.7); font-size: 15px; margin-bottom: 10px; }
 .question-text {
   font: 700 33px/1.15 var(--font-display); letter-spacing: -0.02em; text-wrap: balance;
-  text-shadow: 0 2px 20px rgba(0,0,0,.5); min-height: 3.45em; margin-bottom: auto;
+  text-shadow: 0 2px 20px rgba(0,0,0,.5);
 }
+/* „i“ unter der Frage – klappt die Erklärung auf */
+.question-info {
+  align-self: center; display: grid; place-items: center; width: 40px; height: 40px; margin: 14px 0 0; padding: 0;
+  border: 0; border-radius: 50%; background: rgba(255,255,255,.12); color: rgba(255,255,255,.85);
+  -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); cursor: pointer; transition: background .2s ease, color .2s ease;
+}
+.question-info .ic { width: 22px; height: 22px; }
+.question-info.open { background: var(--accent); color: var(--on-accent); }
+.question-help {
+  margin: 12px 0 auto; padding: 13px 16px; border-radius: 16px; text-align: left;
+  background: rgba(20, 20, 22, 0.62); border: 1px solid rgba(255,255,255,.1);
+  -webkit-backdrop-filter: blur(22px); backdrop-filter: blur(22px);
+  color: rgba(255,255,255,.92); font-size: 15.5px; line-height: 1.45; animation: help-in .22s ease both;
+}
+@keyframes help-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+/* Ist die Erklärung zu, schiebt das „i“ die Antworten nach unten (wie vorher die Frage). */
+.question-help[hidden] + .answer-row { margin-top: auto; }
+.question-help:not([hidden]) + .answer-row { margin-top: 0; }
 .answer-row { display: flex; justify-content: space-around; align-items: center; padding: 28px 6px 0; }
 .answer {
   display: grid; place-items: center; width: 86px; height: 86px; padding: 0; border-radius: 50%;
