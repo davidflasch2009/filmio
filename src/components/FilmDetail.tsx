@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useState, type ReactNode, type RefObject } from "react"
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from "react"
 import type { Answer, Film, MyCinema, Service } from "../types"
 import { QUESTIONS } from "../lib/scoring"
 import { formatDate, formatRating, formatRuntime, localDateStamp } from "../lib/format"
@@ -164,7 +164,9 @@ export default function FilmDetail({
   const [menu, setMenu] = useState<null | "main" | "lists">(null)
   /** Notiz wird gerade geschrieben/bearbeitet. */
   const [editingNote, setEditingNote] = useState(false)
-  const look = readLook()
+  // Handlung: 3 Zeilen; „Mehr“ nur, wenn der Text wirklich länger ist.
+  const overviewRef = useRef<HTMLParagraphElement>(null)
+  const [overflows, setOverflows] = useState(false)
   const [addingParts, setAddingParts] = useState(false)
 
   /** Angezeigte Daten: gespeicherter Film, sonst die Vorschau – ergänzt, sobald TMDB geantwortet hat. */
@@ -188,7 +190,7 @@ export default function FilmDetail({
   const rewatches = film.rewatches ?? []
   const allTags = [...new Set(films.flatMap((f) => f.tags ?? []))].sort((a, b) => a.localeCompare(b, "de"))
   const regionLabel = REGIONS.find((r) => r.id === region)?.label ?? region
-  const longOverview = view.overview.length > 320
+
 
   const savedById = new Map(films.map((f) => [f.tmdbId, f]))
   const parts = collection?.parts ?? []
@@ -205,6 +207,16 @@ export default function FilmDetail({
       setAddingParts(false)
     }
   }
+
+  useLayoutEffect(() => {
+    const el = overviewRef.current
+    if (!el || expanded) return
+    const check = () => setOverflows(el.scrollHeight > el.clientHeight + 1)
+    check()
+    const ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(check) : null
+    ro?.observe(el)
+    return () => ro?.disconnect()
+  }, [view.overview, expanded])
 
   const ratingStars = watched && film.rating !== null
   const tags = film.tags ?? []
@@ -275,8 +287,6 @@ export default function FilmDetail({
   return (
     <div
       className={`overlay detail d-new${instant ? "" : " detail-enter"}`}
-      data-hero={look.hero}
-      data-bg={look.bg}
       role="dialog"
       aria-modal="true"
       aria-label={view.title}
@@ -297,25 +307,16 @@ export default function FilmDetail({
             <IconMore />
           </button>
         )}
-        {look.hero === "b" && heroText}
       </div>
-      {look.hero === "c" && (
-        <div className="d-hero-c">
-          <div className="d-hero-poster"><Poster path={view.posterPath} title={view.title} /></div>
-          {heroText}
-        </div>
-      )}
+      <div className="d-hero-c">
+        <div className="d-hero-poster"><Poster path={view.posterPath} title={view.title} /></div>
+        {heroText}
+      </div>
 
       <div className="d-body">
-        <div className={`d-actions d-actions-${look.btns}`}>
-          {look.btns === "two" ? (
-            <>
-              {primary}
-              {secondary.length > 0 && <div className="d-actions-row" style={{ gridTemplateColumns: `repeat(${secondary.length}, 1fr)` }}>{secondary}</div>}
-            </>
-          ) : (
-            <div className="d-actions-row" style={{ gridTemplateColumns: `repeat(${secondary.length + 1}, 1fr)` }}>{primary}{secondary}</div>
-          )}
+        <div className="d-actions d-actions-two">
+          {primary}
+          {secondary.length > 0 && <div className="d-actions-row" style={{ gridTemplateColumns: `repeat(${secondary.length}, 1fr)` }}>{secondary}</div>}
         </div>
 
         {!saved && !full && loadFailed && (
@@ -325,11 +326,11 @@ export default function FilmDetail({
         {(extras?.tagline || view.overview) && (
           <section className="d-section">
             <h3>Handlung</h3>
-            {extras?.tagline && <p className="tagline">{extras.tagline}</p>}
-            {view.overview && (
-              <p className={`overview${longOverview && !expanded ? " overview-clamped" : ""}`}>{view.overview}</p>
-            )}
-            {longOverview && (
+            {expanded && extras?.tagline && <p className="tagline">{extras.tagline}</p>}
+            {view.overview ? (
+              <p ref={overviewRef} className={`overview${expanded ? "" : " d-clamp3"}`}>{view.overview}</p>
+            ) : !expanded && extras?.tagline && <p className="tagline">{extras.tagline}</p>}
+            {(overflows || expanded || (extras?.tagline && view.overview)) && (
               <button type="button" className="text-btn text-btn-inline more-btn" onClick={() => setExpanded((e) => !e)}>
                 {expanded ? "Weniger" : "Mehr"}
               </button>
@@ -546,14 +547,4 @@ export default function FilmDetail({
       )}
     </div>
   )
-}
-
-/** Vorschau-Schalter (nur zum Vergleichen der Entwürfe). */
-function readLook(): { hero: "b" | "c"; bg: "subtle" | "strong"; btns: "one" | "two" } {
-  try {
-    const l = JSON.parse(localStorage.getItem("filmio.detailLook") || "{}") as Record<string, string>
-    return { hero: l.hero === "c" ? "c" : "b", bg: l.bg === "strong" ? "strong" : "subtle", btns: l.btns === "one" ? "one" : "two" }
-  } catch {
-    return { hero: "b", bg: "subtle", btns: "two" }
-  }
 }

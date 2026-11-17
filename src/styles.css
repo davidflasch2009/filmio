@@ -875,13 +875,11 @@ div.card-main { cursor: default; }
 .d-new > * { position: relative; z-index: 1; }
 .d-new > .d-ambient { position: absolute; z-index: 0; inset: 0 0 auto 0; height: 1500px; overflow: hidden; pointer-events: none;
   -webkit-mask-image: linear-gradient(to bottom, #000 0%, transparent 100%); mask-image: linear-gradient(to bottom, #000 0%, transparent 100%); }
-.d-ambient img { width: 100%; height: 100%; object-fit: cover; filter: blur(48px) saturate(1.15); transform: scale(1.3); opacity: .22; }
-.d-new[data-bg="strong"] .d-ambient img { opacity: .42; }
+.d-ambient img { width: 100%; height: 100%; object-fit: cover; filter: blur(48px) saturate(1.15); transform: scale(1.3); opacity: .42; }
 
 /* Oben */
 .d-hero { position: relative; }
-.d-hero-img { height: min(70vh, 620px); -webkit-mask-image: linear-gradient(to bottom, #000 58%, transparent 100%); mask-image: linear-gradient(to bottom, #000 58%, transparent 100%); }
-.d-new[data-hero="c"] .d-hero-img { height: min(44vh, 380px); }
+.d-hero-img { height: min(44vh, 380px); -webkit-mask-image: linear-gradient(to bottom, #000 58%, transparent 100%); mask-image: linear-gradient(to bottom, #000 58%, transparent 100%); }
 .d-hero-img .hero-img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .d-hero-img .hero-empty { height: 100%; }
 .d-more-btn { position: absolute; z-index: 2; top: calc(12px + env(safe-area-inset-top)); right: max(14px, env(safe-area-inset-right)); }
@@ -928,10 +926,6 @@ div.card-main { cursor: default; }
 .d-btn-primary { background: var(--accent); color: var(--on-accent); font-size: 16px; }
 .d-btn-primary .ic { color: var(--on-accent); }
 .d-btn-on { background: var(--accent-soft); }
-/* Eine Reihe: alle als gleich große Kacheln (Symbol über Text) */
-.d-actions-one .d-btn { flex-direction: column; gap: 5px; height: 68px; padding: 6px 4px; font-size: 12px; }
-.d-actions-one .d-btn span { white-space: normal; text-align: center; line-height: 1.2; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
-.d-actions-one .d-btn-primary { font-size: 12px; }
 
 /* Deins */
 .d-note { display: flex; gap: 10px; align-items: flex-start; width: 100%; padding: 0; border: 0; background: none; color: var(--fg-2); text-align: left; font-size: 16px; line-height: 1.45; cursor: pointer; }
@@ -977,3 +971,5 @@ div.card-main { cursor: default; }
 .d-new .viewings { background: none; border-radius: 0; margin-top: 4px; }
 .d-new .viewings li { padding-left: 0; padding-right: 0; }
 .d-new .viewings li + li { border-top: 1px solid var(--line); }
+.d-clamp3 { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.sheet-row .service-check .ic { width: 15px; height: 15px; color: var(--on-accent); }
