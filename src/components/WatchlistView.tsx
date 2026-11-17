@@ -6,7 +6,7 @@ import { smallImageUrl } from "../lib/tmdb"
 import FilmCard from "./FilmCard"
 import FilterChip from "./FilterChip"
 import ViewHeader from "./ViewHeader"
-import { IconCheck, IconDice, IconFlagFilled, IconTv } from "./Icons"
+import { IconBookmark, IconDice, IconFlagFilled, IconTv } from "./Icons"
 
 interface Props {
   films: Film[]
@@ -18,19 +18,19 @@ interface Props {
   cinema: MyCinema | null
   programme: CpxMovie[] | null
   onOpen: (film: Film) => void
-  onMarkWatched: (film: Film) => void
   onFindFilms: () => void
   onRandom: () => void
   onOpenServices: () => void
 }
 
 const PRIORITY_MARKER = { icon: <IconFlagFilled />, label: "Priorität" }
+const WATCHLIST_MARKER = { icon: <IconBookmark />, label: "Auf der Watchlist" }
 
 function serviceLogos(list: Service[] | undefined) {
   return (list ?? []).filter((s) => s.logoPath).map((s) => ({ src: smallImageUrl(s.logoPath, "w92")!, name: s.name }))
 }
 
-export default function WatchlistView({ films, region, services, streams, cinema, programme, onOpen, onMarkWatched, onFindFilms, onRandom, onOpenServices }: Props) {
+export default function WatchlistView({ films, region, services, streams, cinema, programme, onOpen, onFindFilms, onRandom, onOpenServices }: Props) {
   const [streamOnly, setStreamOnly] = useState(false)
   const [tag, setTag] = useState("")
 
@@ -129,15 +129,11 @@ export default function WatchlistView({ films, region, services, streams, cinema
                   title={f.title}
                   year={f.year}
                   posterPath={f.posterPath}
-                  marker={f.priority ? PRIORITY_MARKER : undefined}
+                  marker={f.priority ? PRIORITY_MARKER : WATCHLIST_MARKER}
                   logos={serviceLogos(streams.get(f.tmdbId))}
                   badge={inCinema.has(f.tmdbId) ? "Im Kino" : undefined}
                   onOpen={() => onOpen(f)}
-                >
-                  <button type="button" className="pill pill-accent" onClick={() => onMarkWatched(f)} aria-label={`${f.title} als gesehen markieren`}>
-                    <IconCheck />Gesehen
-                  </button>
-                </FilmCard>
+                />
               ))}
             </div>
           )}
@@ -152,7 +148,7 @@ export default function WatchlistView({ films, region, services, streams, cinema
                     title={f.title}
                     year={f.year}
                     posterPath={f.posterPath}
-                    marker={f.priority ? PRIORITY_MARKER : undefined}
+                    marker={f.priority ? PRIORITY_MARKER : WATCHLIST_MARKER}
                     badge={formatUpcomingShort(when, today)}
                     onOpen={() => onOpen(f)}
                   />

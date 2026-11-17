@@ -409,7 +409,6 @@ function FilmApp({ account, onSignOut }: { account: string; onSignOut: () => voi
             cinema={cinema}
             programme={programme}
             onOpen={openSaved}
-            onMarkWatched={setRating}
             onFindFilms={() => changeTab("search")}
             onRandom={() => setPicking(true)}
             onOpenServices={() => setServicesOpen(true)}

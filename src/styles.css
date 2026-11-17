@@ -857,7 +857,6 @@ div.card-main { cursor: default; }
 .cinema-source { margin-top: 10px; font-size: 12px; }
 
 /* ---------- Stil „Kino-Gold“ (Listen + Suche) ---------- */
-body { background: radial-gradient(120% 45% at 50% -10%, rgba(229, 184, 0, 0.2), transparent 60%) no-repeat, var(--bg); background-attachment: fixed; }
 .main .view-title { font-size: 38px; font-weight: 800; letter-spacing: -0.035em; color: var(--accent); }
 .main .poster { box-shadow: 0 0 0 1px rgba(245, 197, 24, 0.18), 0 14px 28px -6px rgba(0, 0, 0, 0.8); }
 .main .card-title { font-weight: 700; }
