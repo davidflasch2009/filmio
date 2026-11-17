@@ -16,8 +16,10 @@ import PosterRow from "./PosterRow"
 import TagEditor from "./TagEditor"
 import CinemaSessions from "./CinemaSessions"
 import {
-  IconBookmark, IconCalendar, IconCheck, IconChevronLeft, IconFlag, IconFlagFilled, IconHistory, IconMinus, IconPlay, IconPlus, IconRepeat, IconTrash, IconX,
+  IconBookmark, IconCalendar, IconCheck, IconChevronDown, IconChevronLeft, IconChevronRight, IconFlag, IconFlagFilled, IconHistory, IconList,
+  IconMinus, IconMore, IconNote, IconPlay, IconPlus, IconRepeat, IconTrash, IconX,
 } from "./Icons"
+import { Poster } from "./FilmCard"
 
 interface Props {
   film: Film
@@ -152,13 +154,17 @@ export default function FilmDetail({
 
   const [note, setNote] = useState(film.note)
   const [noteFor, setNoteFor] = useState(film.note)
-  const [noteSaved, setNoteSaved] = useState(false)
   // Wenn sich die gespeicherte Notiz ändert, Feld nachziehen.
   if (film.note !== noteFor) {
     setNoteFor(film.note)
     setNote(film.note)
   }
   const [expanded, setExpanded] = useState(false)
+  /** „•••“-Menü offen; "lists" = Unterseite „Zu Liste hinzufügen“. */
+  const [menu, setMenu] = useState<null | "main" | "lists">(null)
+  /** Notiz wird gerade geschrieben/bearbeitet. */
+  const [editingNote, setEditingNote] = useState(false)
+  const look = readLook()
   const [addingParts, setAddingParts] = useState(false)
 
   /** Angezeigte Daten: gespeicherter Film, sonst die Vorschau – ergänzt, sobald TMDB geantwortet hat. */
@@ -200,88 +206,124 @@ export default function FilmDetail({
     }
   }
 
+  const ratingStars = watched && film.rating !== null
+  const tags = film.tags ?? []
+  const hasMine = saved && (film.note !== "" || editingNote || tags.length > 0 || rewatches.length > 0)
+  const genresText = view.genres.slice(0, 3).join(", ")
+  const metaLine = [meta, genresText].filter(Boolean).join(" · ")
+
+  /** Hauptknopf + weitere Aktionen – alle in derselben Form. */
+  const primary = (
+    <button type="button" className="d-btn d-btn-primary" disabled={!draft} onClick={() => draft && onRate(draft)}>
+      <IconCheck />
+      <span>{watched ? (earlier ? "Jetzt bewerten" : "Neu bewerten") : "Gesehen – jetzt bewerten"}</span>
+    </button>
+  )
+  const secondary: ReactNode[] = []
+  if (!saved) {
+    secondary.push(
+      <button key="wl" type="button" className="d-btn" disabled={!draft} onClick={() => draft && onAddToWatchlist(draft)}>
+        <IconPlus /><span>Watchlist</span>
+      </button>,
+    )
+  }
+  if (saved && !watched) {
+    secondary.push(
+      <button key="prio" type="button" className={`d-btn${film.priority ? " d-btn-on" : ""}`} aria-pressed={!!film.priority} onClick={() => onTogglePriority(film)}>
+        {film.priority ? <IconFlagFilled /> : <IconFlag />}<span>Priorität</span>
+      </button>,
+    )
+  }
+  if (!watched) {
+    secondary.push(
+      <button key="earlier" type="button" className="d-btn" disabled={!draft} onClick={() => draft && onSaveWithoutRating(draft)}>
+        <IconHistory /><span>Früher gesehen</span>
+      </button>,
+    )
+  }
+  if (watched) {
+    secondary.push(
+      <button key="again" type="button" className="d-btn" onClick={() => onSetRewatches(film, [...rewatches, new Date().toISOString()])}>
+        <IconRepeat /><span>Nochmal gesehen</span>
+      </button>,
+    )
+  }
+  if (extras?.trailerUrl) {
+    secondary.push(
+      <a key="trailer" className="d-btn" href={extras.trailerUrl} target="_blank" rel="noopener noreferrer">
+        <IconPlay /><span>Trailer</span>
+      </a>,
+    )
+  }
+
+  const heroText = (
+    <div className="d-hero-text">
+      {saved && <span className="hero-status">{earlier ? "Früher gesehen" : film.status === "watched" ? "Gesehen" : "Watchlist"}</span>}
+      <h2 className="detail-title">{view.title}</h2>
+      {metaLine && <p className="detail-meta">{metaLine}</p>}
+      {ratingStars && (
+        <p className="d-rating">
+          <StarRating value={film.rating!} size={20} />
+          <span className="d-rating-num">{formatRating(film.rating!)}</span>
+          {film.fromNotes && <span className="d-rating-note"><IconNote />aus Notizen</span>}
+        </p>
+      )}
+      {upcoming && <p className="release-chip"><IconCalendar />{formatUpcomingLong(upcoming)}</p>}
+    </div>
+  )
+
   return (
-    <div className={`overlay detail${instant ? "" : " detail-enter"}`} role="dialog" aria-modal="true" aria-label={view.title} ref={scrollerRef}>
-      <div className="hero">
-        <Hero film={view} />
+    <div
+      className={`overlay detail d-new${instant ? "" : " detail-enter"}`}
+      data-hero={look.hero}
+      data-bg={look.bg}
+      role="dialog"
+      aria-modal="true"
+      aria-label={view.title}
+      ref={scrollerRef}
+    >
+      {/* Szenenbild läuft dezent verschwommen hinter der Seite weiter */}
+      {(view.backdropPath || view.posterPath) && (
+        <div className="d-ambient" aria-hidden="true">
+          <img src={view.backdropPath ? backdropUrl(view.backdropPath, "w780")! : posterUrl(view.posterPath, "w185")!} alt="" />
+        </div>
+      )}
+
+      <div className="d-hero">
+        <div className="d-hero-img"><Hero film={view} /></div>
         <button type="button" className="glass-btn back-btn" onClick={onClose} aria-label="Zurück"><IconChevronLeft /></button>
-        <div className="hero-text">
-          {saved && <span className="hero-status">{earlier ? "Früher gesehen" : film.status === "watched" ? "Gesehen" : "Watchlist"}</span>}
-          <h2 className="detail-title">{view.title}</h2>
-          {meta && <p className="detail-meta">{meta}</p>}
-          {upcoming && <p className="release-chip"><IconCalendar />{formatUpcomingLong(upcoming)}</p>}
-        </div>
-      </div>
-
-      <div className="detail-body">
-        {view.genres.length > 0 && <p className="detail-genres">{view.genres.join(" · ")}</p>}
-
-        {watched && film.rating !== null && (
-          <div className="rating-card">
-            <div className="detail-rating">
-              <StarRating value={film.rating} size={26} />
-              <span className="detail-rating-num">{formatRating(film.rating)}</span>
-            </div>
-            <label className="check">
-              <input type="checkbox" checked={film.fromNotes} onChange={(e) => onSetFromNotes(film, e.target.checked)} />
-              <span>Aus meinen Notizen – nicht in der App bewertet</span>
-            </label>
-          </div>
-        )}
-
-        <div className="detail-actions">
-          <button type="button" className="btn btn-primary btn-block" disabled={!draft} onClick={() => draft && onRate(draft)}>
-            {watched ? (earlier ? "Jetzt bewerten" : "Neu bewerten") : <><IconCheck />Gesehen – jetzt bewerten</>}
+        {saved && (
+          <button type="button" className="glass-btn d-more-btn" onClick={() => setMenu("main")} aria-label="Weitere Aktionen">
+            <IconMore />
           </button>
-          <div className="action-row">
-            {!saved && (
-              <button type="button" className="action-btn" disabled={!draft} onClick={() => draft && onAddToWatchlist(draft)}>
-                <IconPlus /><span>Watchlist</span>
-              </button>
-            )}
-            {!watched && (
-              <button type="button" className="action-btn" disabled={!draft} onClick={() => draft && onSaveWithoutRating(draft)}>
-                <IconHistory /><span>Früher gesehen</span>
-              </button>
-            )}
-            {saved && !watched && (
-              <button
-                type="button"
-                className={`action-btn${film.priority ? " action-on" : ""}`}
-                aria-pressed={!!film.priority}
-                onClick={() => onTogglePriority(film)}
-              >
-                {film.priority ? <IconFlagFilled /> : <IconFlag />}<span>Priorität</span>
-              </button>
-            )}
-            {watched && (
-              <button type="button" className="action-btn" onClick={() => onSetRewatches(film, [...rewatches, new Date().toISOString()])}>
-                <IconRepeat /><span>Nochmal gesehen</span>
-              </button>
-            )}
-            {watched && (
-              <button type="button" className="action-btn" onClick={() => onMoveToWatchlist(film)}>
-                <IconBookmark /><span>Auf Watchlist</span>
-              </button>
-            )}
-            {extras?.trailerUrl && (
-              <a className="action-btn" href={extras.trailerUrl} target="_blank" rel="noopener noreferrer">
-                <IconPlay /><span>Trailer</span>
-              </a>
-            )}
-          </div>
-        </div>
-
-        {cinema && (
-          <CinemaSessions cinema={cinema} film={{ title: view.title, year: view.year, originalTitle: extras?.originalTitle }} />
         )}
+        {look.hero === "b" && heroText}
+      </div>
+      {look.hero === "c" && (
+        <div className="d-hero-c">
+          <div className="d-hero-poster"><Poster path={view.posterPath} title={view.title} /></div>
+          {heroText}
+        </div>
+      )}
+
+      <div className="d-body">
+        <div className={`d-actions d-actions-${look.btns}`}>
+          {look.btns === "two" ? (
+            <>
+              {primary}
+              {secondary.length > 0 && <div className="d-actions-row" style={{ gridTemplateColumns: `repeat(${secondary.length}, 1fr)` }}>{secondary}</div>}
+            </>
+          ) : (
+            <div className="d-actions-row" style={{ gridTemplateColumns: `repeat(${secondary.length + 1}, 1fr)` }}>{primary}{secondary}</div>
+          )}
+        </div>
 
         {!saved && !full && loadFailed && (
           <p className="notice notice-error" role="alert">Die Filmdetails konnten nicht geladen werden. Bist du online?</p>
         )}
 
         {(extras?.tagline || view.overview) && (
-          <section className="detail-section">
+          <section className="d-section">
             <h3>Handlung</h3>
             {extras?.tagline && <p className="tagline">{extras.tagline}</p>}
             {view.overview && (
@@ -295,105 +337,86 @@ export default function FilmDetail({
           </section>
         )}
 
-        {watched && rewatches.length > 0 && (
-          <section className="detail-section">
-            <div className="section-head">
-              <h3>Gesehen</h3>
-              <span className="section-note">{rewatches.length + 1}×</span>
-            </div>
-            <ul className="viewings">
-              <li>
-                <span className="viewing-label">Zum ersten Mal</span>
-                <span className="viewing-date">{formatDate(film.watchedAt) ?? "Datum unbekannt"}</span>
-              </li>
-              {rewatches.map((iso, i) => (
-                <li key={i}>
-                  <span className="viewing-label">{i + 2}. Mal</span>
-                  <input
-                    type="date"
-                    className="viewing-input"
-                    aria-label={`Datum ${i + 2}. Mal`}
-                    value={localDateStamp(new Date(iso))}
-                    max={localDateStamp()}
-                    onChange={(e) => {
-                      const next = dayToIso(e.target.value)
-                      if (next) onSetRewatches(film, rewatches.map((r, j) => (j === i ? next : r)))
-                    }}
-                  />
-                  <button
-                    type="button"
-                    className="viewing-remove"
-                    aria-label={`${i + 2}. Mal entfernen`}
-                    onClick={() => onSetRewatches(film, rewatches.filter((_, j) => j !== i))}
-                  >
-                    <IconX />
+        {hasMine && (
+          <section className="d-section d-mine">
+            <h3>Deins</h3>
+            {editingNote ? (
+              <div className="note-edit">
+                <textarea
+                  className="note-field"
+                  aria-label="Notiz"
+                  value={note}
+                  rows={3}
+                  autoFocus
+                  placeholder="Was willst du dir zu dem Film merken?"
+                  onChange={(e) => setNote(e.target.value)}
+                />
+                <div className="note-actions">
+                  <button type="button" className="btn btn-small btn-primary" onClick={() => { onSaveNote(film, note.trim()); setEditingNote(false) }}>
+                    Notiz speichern
                   </button>
-                </li>
-              ))}
-            </ul>
-          </section>
-        )}
-
-        {watched && (
-          <section className="detail-section">
-            <h3>Notiz</h3>
-            <textarea
-              className="note-field"
-              aria-label="Notiz"
-              value={note}
-              rows={3}
-              placeholder="Was willst du dir zu dem Film merken?"
-              onChange={(e) => { setNote(e.target.value); setNoteSaved(false) }}
-            />
-            <div className="note-actions">
-              <button
-                type="button"
-                className="btn btn-small"
-                disabled={note.trim() === film.note}
-                onClick={() => { onSaveNote(film, note.trim()); setNoteSaved(true) }}
-              >
-                Notiz speichern
+                  <button type="button" className="text-btn" onClick={() => { setNote(film.note); setEditingNote(false) }}>Abbrechen</button>
+                </div>
+              </div>
+            ) : film.note && (
+              <button type="button" className="d-note" onClick={() => setEditingNote(true)} aria-label="Notiz bearbeiten">
+                <IconNote /><span>{film.note}</span>
               </button>
-              {noteSaved && note.trim() === film.note && <span className="hint">Gespeichert ✓</span>}
-            </div>
-          </section>
-        )}
-
-        {saved && (
-          <section className="detail-section">
-            <h3>Listen</h3>
-            <TagEditor tags={film.tags ?? []} allTags={allTags} onChange={(tags) => onSetTags(film, tags)} />
-          </section>
-        )}
-
-        {watched && film.answers && counts && (
-          <details className="detail-section profile-details">
-            <summary>
-              <h3>Antwortprofil</h3>
-              <span className="profile-counts">Ja {counts.ja} · Neutral {counts.neutral} · Nein {counts.nein}</span>
-            </summary>
-            <ol className="answer-profile">
-              {QUESTIONS.map((q, i) => {
-                const a = film.answers![i]
-                return (
-                  <li key={q} className={`profile-${a}`}>
-                    <span className="profile-icon">{ANSWER_ICON[a]}</span>
-                    <span className="profile-question">{q}</span>
-                    <span className="profile-answer">{ANSWER_LABEL[a]}</span>
+            )}
+            {tags.length > 0 && (
+              <ul className="tag-list d-tags">
+                {tags.map((t) => (
+                  <li key={t} className="tag">
+                    <span>{t}</span>
+                    <button type="button" className="tag-remove" aria-label={`Aus „${t}“ entfernen`} onClick={() => onSetTags(film, tags.filter((x) => x !== t))}>
+                      <IconX />
+                    </button>
                   </li>
-                )
-              })}
-            </ol>
-          </details>
+                ))}
+              </ul>
+            )}
+            {watched && rewatches.length > 0 && (
+              <>
+                <p className="d-sub">{rewatches.length + 1}× gesehen</p>
+                <ul className="viewings">
+                  <li>
+                    <span className="viewing-label">Zum ersten Mal</span>
+                    <span className="viewing-date">{formatDate(film.watchedAt) ?? "Datum unbekannt"}</span>
+                  </li>
+                  {rewatches.map((iso, i) => (
+                    <li key={i}>
+                      <span className="viewing-label">{i + 2}. Mal</span>
+                      <input
+                        type="date"
+                        className="viewing-input"
+                        aria-label={`Datum ${i + 2}. Mal`}
+                        value={localDateStamp(new Date(iso))}
+                        max={localDateStamp()}
+                        onChange={(e) => {
+                          const next = dayToIso(e.target.value)
+                          if (next) onSetRewatches(film, rewatches.map((r, j) => (j === i ? next : r)))
+                        }}
+                      />
+                      <button type="button" className="viewing-remove" aria-label={`${i + 2}. Mal entfernen`} onClick={() => onSetRewatches(film, rewatches.filter((_, j) => j !== i))}>
+                        <IconX />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+          </section>
+        )}
+
+        {cinema && (
+          <CinemaSessions cinema={cinema} film={{ title: view.title, year: view.year, originalTitle: extras?.originalTitle }} />
         )}
 
         {watch && (
-          <section className="detail-section">
+          <section className="d-section">
             <div className="section-head">
               <h3>Wo läuft der Film?</h3>
-              {(watch.stream.length > 0 || watch.rentBuy.length > 0) && (
-                <span className="section-note">Quelle: JustWatch</span>
-              )}
+              {(watch.stream.length > 0 || watch.rentBuy.length > 0) && <span className="section-note">Quelle: JustWatch</span>}
             </div>
             {watch.stream.length === 0 && watch.rentBuy.length === 0 ? (
               <p className="hint">In {regionLabel} derzeit bei keinem Anbieter.</p>
@@ -407,7 +430,7 @@ export default function FilmDetail({
         )}
 
         {extras && (extras.cast.length > 0 || extras.directors.length > 0) && (
-          <section className="detail-section">
+          <section className="d-section">
             <h3>Besetzung</h3>
             {extras.directors.length > 0 && <p className="directors">Regie: {extras.directors.join(", ")}</p>}
             {extras.cast.length > 0 && (
@@ -448,15 +471,89 @@ export default function FilmDetail({
         )}
 
         {saved && (
-          <footer className="detail-footer">
+          <details className="d-section d-more">
+            <summary><h3>Mehr Infos</h3><IconChevronDown className="d-more-chevron" /></summary>
             <p className="detail-dates">
               Hinzugefügt am {formatDate(film.addedAt)}
               {watched && film.watchedAt && <> · Gesehen am {formatDate(film.watchedAt)}</>}
             </p>
-            <button type="button" className="text-btn delete-btn" onClick={() => onDelete(film)}><IconTrash />Löschen</button>
-          </footer>
+            {watched && film.answers && counts && (
+              <>
+                <p className="d-sub">Antwortprofil · Ja {counts.ja} · Neutral {counts.neutral} · Nein {counts.nein}</p>
+                <ol className="answer-profile">
+                  {QUESTIONS.map((q, i) => {
+                    const a = film.answers![i]
+                    return (
+                      <li key={q} className={`profile-${a}`}>
+                        <span className="profile-icon">{ANSWER_ICON[a]}</span>
+                        <span className="profile-question">{q}</span>
+                        <span className="profile-answer">{ANSWER_LABEL[a]}</span>
+                      </li>
+                    )
+                  })}
+                </ol>
+              </>
+            )}
+          </details>
         )}
       </div>
+
+      {menu && saved && (
+        <div className="sheet-backdrop" onClick={(e) => { if (e.target === e.currentTarget) setMenu(null) }}>
+          <div className="sheet" role="dialog" aria-label={menu === "lists" ? "Zu Liste hinzufügen" : "Weitere Aktionen"}>
+            <div className="sheet-grip" aria-hidden="true" />
+            {menu === "main" ? (
+              <>
+                <p className="sheet-title">{view.title}</p>
+                <div className="sheet-group">
+                  <button type="button" className="sheet-row" onClick={() => { setMenu(null); setNote(film.note); setEditingNote(true) }}>
+                    <IconNote /><span>{film.note ? "Notiz bearbeiten" : "Notiz hinzufügen"}</span>
+                  </button>
+                  <button type="button" className="sheet-row" onClick={() => setMenu("lists")}>
+                    <IconList /><span>Zu Liste hinzufügen</span><IconChevronRight className="sheet-chevron" />
+                  </button>
+                  {watched && film.rating !== null && (
+                    <button type="button" className="sheet-row" role="menuitemcheckbox" aria-checked={film.fromNotes} onClick={() => onSetFromNotes(film, !film.fromNotes)}>
+                      <IconNote /><span>Aus meinen Notizen bewertet</span>
+                      <span className={`service-check${film.fromNotes ? " on" : ""}`} aria-hidden="true">{film.fromNotes && <IconCheck />}</span>
+                    </button>
+                  )}
+                  {watched && (
+                    <button type="button" className="sheet-row" onClick={() => { setMenu(null); onMoveToWatchlist(film) }}>
+                      <IconBookmark /><span>Zurück auf die Watchlist</span>
+                    </button>
+                  )}
+                </div>
+                <div className="sheet-group">
+                  <button type="button" className="sheet-row sheet-danger" onClick={() => { setMenu(null); onDelete(film) }}>
+                    <IconTrash /><span>Löschen</span>
+                  </button>
+                </div>
+                <button type="button" className="sheet-cancel" onClick={() => setMenu(null)}>Abbrechen</button>
+              </>
+            ) : (
+              <>
+                <div className="sheet-head">
+                  <button type="button" className="text-btn" onClick={() => setMenu("main")}><IconChevronLeft />Zurück</button>
+                  <p className="sheet-title">Listen</p>
+                  <button type="button" className="text-btn" onClick={() => setMenu(null)}>Fertig</button>
+                </div>
+                <TagEditor tags={tags} allTags={allTags} onChange={(t) => onSetTags(film, t)} />
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
+}
+
+/** Vorschau-Schalter (nur zum Vergleichen der Entwürfe). */
+function readLook(): { hero: "b" | "c"; bg: "subtle" | "strong"; btns: "one" | "two" } {
+  try {
+    const l = JSON.parse(localStorage.getItem("filmio.detailLook") || "{}") as Record<string, string>
+    return { hero: l.hero === "c" ? "c" : "b", bg: l.bg === "strong" ? "strong" : "subtle", btns: l.btns === "one" ? "one" : "two" }
+  } catch {
+    return { hero: "b", bg: "subtle", btns: "two" }
+  }
 }
