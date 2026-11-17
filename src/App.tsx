@@ -479,6 +479,7 @@ function FilmApp({ account, onSignOut }: { account: string; onSignOut: () => voi
           onCancel={() => setRating(null)}
           onSave={(result) => saveRating(rating, result)}
           onSaveWithoutRating={() => saveWithoutRating(rating)}
+          showHelp={settings.questionHelp}
         />
       )}
 

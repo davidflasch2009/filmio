@@ -24,6 +24,8 @@ export const REGIONS: { id: Region; label: string }[] = [
 export interface Settings {
   gridSize: GridSize
   region: Region
+  /** „i“ mit Erklärung bei den Fragen im Fragebogen. */
+  questionHelp: boolean
 }
 
 /** Land aus der Spracheinstellung des Geräts (de-AT → Österreich …), sonst Deutschland. */
@@ -37,13 +39,14 @@ function defaultRegion(): Region {
 }
 
 export function loadSettings(): Settings {
-  const defaults: Settings = { gridSize: "m", region: defaultRegion() }
+  const defaults: Settings = { gridSize: "m", region: defaultRegion(), questionHelp: true }
   try {
     const raw = localStorage.getItem(SETTINGS_KEY)
     const parsed = (raw ? JSON.parse(raw) : null) as Partial<Settings> | null
     return {
       gridSize: GRID_SIZES.some((g) => g.id === parsed?.gridSize) ? parsed!.gridSize! : defaults.gridSize,
       region: REGIONS.some((r) => r.id === parsed?.region) ? parsed!.region! : defaults.region,
+      questionHelp: typeof parsed?.questionHelp === "boolean" ? parsed.questionHelp : defaults.questionHelp,
     }
   } catch {
     return defaults

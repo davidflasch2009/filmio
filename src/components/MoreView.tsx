@@ -6,7 +6,7 @@ import { appVersion } from "../lib/updates"
 import { getSyncState, subscribeSync, syncNow, type SyncState } from "../lib/sync"
 import tmdbLogo from "../assets/tmdb-logo.svg"
 import ViewHeader from "./ViewHeader"
-import { IconChart, IconCheck, IconList, IconChevronRight, IconDownload, IconLogout, IconSync, IconTv, IconUpload, IconUser } from "./Icons"
+import { IconChart, IconCheck, IconInfo, IconList, IconChevronRight, IconDownload, IconLogout, IconSync, IconTv, IconUpload, IconUser } from "./Icons"
 import { smallImageUrl } from "../lib/tmdb"
 import NotificationSettings from "./NotificationSettings"
 
@@ -38,7 +38,7 @@ function syncText(state: SyncState): string {
 }
 
 export default function MoreView({ store, account, onSignOut, onImported, settings, onSettingsChange, onOpenStats, services, onOpenServices, onOpenLists }: Props) {
-  const { gridSize, region } = settings
+  const { gridSize, region, questionHelp } = settings
   const fileRef = useRef<HTMLInputElement>(null)
   const [file, setFile] = useState<File | null>(null)
   const [mode, setMode] = useState<ImportMode>("merge")
@@ -175,6 +175,26 @@ export default function MoreView({ store, account, onSignOut, onImported, settin
             ))}
           </div>
         </fieldset>
+      </div>
+
+      <div className="group">
+        <div className="group-row switch-row">
+          <span className="row-icon"><IconInfo /></span>
+          <span className="row-text" id="help-label">
+            Erklärungen im Fragebogen
+            <span className="row-sub">Das „i“ unter jeder Frage</span>
+          </span>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={questionHelp}
+            aria-labelledby="help-label"
+            className={`switch${questionHelp ? " switch-on" : ""}`}
+            onClick={() => onSettingsChange({ questionHelp: !questionHelp })}
+          >
+            <span className="switch-knob" />
+          </button>
+        </div>
       </div>
 
       <h2 className="group-label">Daten</h2>

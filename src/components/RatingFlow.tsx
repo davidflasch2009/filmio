@@ -19,6 +19,8 @@ interface Props {
   onSave: (result: RatingResult) => void
   /** Als gesehen speichern, ohne zu bewerten (z.B. weil der Film zu lange her ist). */
   onSaveWithoutRating: () => void
+  /** „i“ mit Erklärung zu jeder Frage zeigen (Mehr → Darstellung). */
+  showHelp?: boolean
 }
 
 /** Wie eine Skala: Nein links, Ja rechts unter dem Daumen. */
@@ -115,7 +117,7 @@ function StarReveal({ rating, onDone }: { rating: number; onDone: () => void }) 
 }
 
 /** Fragebogen: eine Frage pro Screen, Auto-Weiter, danach die Sterne-Enthüllung. */
-export default function RatingFlow({ film, onCancel, onSave, onSaveWithoutRating }: Props) {
+export default function RatingFlow({ film, onCancel, onSave, onSaveWithoutRating, showHelp = true }: Props) {
   const total = QUESTIONS.length
   const [step, setStep] = useState(0)
   const [answers, setAnswers] = useState<(Answer | undefined)[]>(() => Array(total).fill(undefined))
@@ -175,7 +177,7 @@ export default function RatingFlow({ film, onCancel, onSave, onSaveWithoutRating
           <section className="question">
             <p className="question-count" aria-live="polite">Frage {step + 1} von {total}</p>
             <h2 className="question-text" ref={headingRef} tabIndex={-1}>{QUESTIONS[step]}</h2>
-            <button
+            {showHelp && <button
               type="button"
               className={`question-info${help ? " open" : ""}`}
               aria-expanded={help}
@@ -184,8 +186,8 @@ export default function RatingFlow({ film, onCancel, onSave, onSaveWithoutRating
               onClick={() => setHelp((h) => !h)}
             >
               <IconInfo />
-            </button>
-            <p id="question-help" className="question-help" hidden={!help}>{QUESTION_HELP[step]}</p>
+            </button>}
+            <p id="question-help" className="question-help" hidden={!showHelp || !help}>{QUESTION_HELP[step]}</p>
             <div className="answer-row">
               {OPTIONS.map((o) => (
                 <button
