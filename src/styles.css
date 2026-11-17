@@ -866,7 +866,7 @@ div.card-main { cursor: default; }
 .main .row-title::before {
   content: ""; position: absolute; left: 0; top: .18em; bottom: .18em; width: 4px; border-radius: 2px; background: var(--accent);
 }
-.main .browse-hero { box-shadow: 0 0 0 1px rgba(245, 197, 24, 0.25), 0 24px 50px -14px rgba(245, 197, 24, 0.35); }
+.main .browse-hero { box-shadow: 0 0 0 1px rgba(245, 197, 24, 0.2), 0 14px 28px -6px rgba(0, 0, 0, 0.8); }
 
 /* ======================================================================
    Detailseite (neu): ruhig, ohne Kästen, Blick von oben nach unten geführt
