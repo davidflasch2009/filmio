@@ -113,6 +113,10 @@ src/
   Übersicht unter Mehr → Meine Listen (umbenennen, löschen)
 - **Jahresrückblick** in der Statistik: Story zum Durchtippen (Filme, Stunden, stärkster Monat, Lieblingsgenre,
   Film des Jahres, Top 5, Lieblingsschauspieler, mehrfach gesehen); zählt nur datierte Filmabende
+- **Mein Kino** (Mehr → Mein Kino, Cineplexx Österreich, auf allen Geräten gleich): Detailseite zeigt „Im Kino“ mit Tagen,
+  Uhrzeiten, 2D/3D/OV, Saal und Preisen (Standard, Cinegold …) plus Link zu den Tickets; Watchlist-Filme im Programm
+  bekommen den Hinweis „Im Kino“. Daten aus der (inoffiziellen) Schnittstelle, die cineplexx.at selbst nutzt – `src/lib/cineplexx.ts`
+- **Erklärungen im Fragebogen**: „i“ unter jeder Frage, unter Mehr → Darstellung abschaltbar
 - **Mitteilungen** (Mehr → Mitteilungen): einmal am Tag, wenn ein Watchlist-Film neu bei deinen Diensten läuft
   oder im gewählten Land ins Kino kommt; Antippen öffnet den Film
 - **Mehrfach gesehen**: „Nochmal gesehen“ auf der Detailseite, Daten änderbar; zählt in Statistik und „Zuletzt gesehen“

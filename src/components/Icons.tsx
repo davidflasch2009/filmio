@@ -96,3 +96,6 @@ export const IconBell = (p: IconProps) => (
 export const IconInfo = (p: IconProps) => (
   <Svg {...p}><circle cx="12" cy="12" r="9" /><path d="M12 11v5.5" /><circle cx="12" cy="7.6" r=".6" fill="currentColor" /></Svg>
 )
+export const IconTicket = (p: IconProps) => (
+  <Svg {...p}><path d="M4 7.5A1.5 1.5 0 0 1 5.5 6h13A1.5 1.5 0 0 1 20 7.5V10a2 2 0 0 0 0 4v2.5a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 16.5V14a2 2 0 0 0 0-4z" /><path d="M14 6.5v11" strokeDasharray="1.6 2" /></Svg>
+)

@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
-import type { Film, Service, Store } from "./types"
-import { addFilm, cleanTags, load, newFilm, removeFilm, setServices, STORAGE_KEY, updateFilm, updateMany, type ImportResult } from "./lib/storage"
+import type { Film, MyCinema, Service, Store } from "./types"
+import { addFilm, cleanTags, load, newFilm, removeFilm, setCinema, setServices, STORAGE_KEY, updateFilm, updateMany, type ImportResult } from "./lib/storage"
 import { formatRating } from "./lib/format"
 import { fetchFilmMeta, hasToken, listItemToInfo, type TmdbListItem } from "./lib/tmdb"
 import { releaseNeedsRefresh, upcomingRelease } from "./lib/release"
 import { useStreams } from "./hooks/useStreams"
 import ServicesPicker from "./components/ServicesPicker"
 import ListsView from "./components/ListsView"
+import CinemaPicker from "./components/CinemaPicker"
+import { useCinemaProgramme } from "./hooks/useCinemaProgramme"
 import { useOnline } from "./hooks/useOnline"
 import { loadSettings, saveSettings, type Settings } from "./lib/settings"
 import TabBar, { type Tab } from "./components/TabBar"
@@ -173,6 +175,10 @@ function FilmApp({ account, onSignOut }: { account: string; onSignOut: () => voi
   const streams = useStreams(store.films, services, region, online)
   const [servicesOpen, setServicesOpen] = useState(false)
   const [listsOpen, setListsOpen] = useState(false)
+  // Mein Kino und dessen Programm.
+  const cinema = store.cinema?.value ?? null
+  const programme = useCinemaProgramme(cinema?.id ?? null, online)
+  const [cinemaOpen, setCinemaOpen] = useState(false)
 
   useEffect(() => {
     if (!toast) return
@@ -180,7 +186,7 @@ function FilmApp({ account, onSignOut }: { account: string; onSignOut: () => voi
     return () => clearTimeout(t)
   }, [toast])
 
-  const overlayOpen = details.length > 0 || rating !== null || picking || statsOpen || servicesOpen || listsOpen
+  const overlayOpen = details.length > 0 || rating !== null || picking || statsOpen || servicesOpen || listsOpen || cinemaOpen
   useEffect(() => {
     document.body.classList.toggle("no-scroll", overlayOpen)
   }, [overlayOpen])
@@ -330,6 +336,10 @@ function FilmApp({ account, onSignOut }: { account: string; onSignOut: () => voi
     }
   }
 
+  function changeCinema(value: MyCinema | null) {
+    persist(() => setCinema(value))
+  }
+
   function changeServices(list: Service[]) {
     persist(() => setServices(list))
   }
@@ -396,6 +406,8 @@ function FilmApp({ account, onSignOut }: { account: string; onSignOut: () => voi
             region={region}
             services={services}
             streams={streams}
+            cinema={cinema}
+            programme={programme}
             onOpen={openSaved}
             onMarkWatched={setRating}
             onFindFilms={() => changeTab("search")}
@@ -429,6 +441,8 @@ function FilmApp({ account, onSignOut }: { account: string; onSignOut: () => voi
             services={services}
             onOpenServices={() => setServicesOpen(true)}
             onOpenLists={() => setListsOpen(true)}
+            cinema={cinema}
+            onOpenCinema={() => setCinemaOpen(true)}
           />
         </div>
       </main>
@@ -436,6 +450,8 @@ function FilmApp({ account, onSignOut }: { account: string; onSignOut: () => voi
       <TabBar active={tab} onChange={changeTab} />
 
       {statsOpen && <StatsView films={store.films} onClose={() => setStatsOpen(false)} onOpen={openSaved} />}
+
+      {cinemaOpen && <CinemaPicker selected={cinema} onChange={changeCinema} onClose={() => setCinemaOpen(false)} />}
 
       {listsOpen && (
         <ListsView films={store.films} onOpen={openSaved} onRename={renameTag} onDelete={deleteTag} onClose={() => setListsOpen(false)} />
@@ -455,6 +471,7 @@ function FilmApp({ account, onSignOut }: { account: string; onSignOut: () => voi
           scrollerRef={detailRef}
           region={settings.region}
           services={services}
+          cinema={cinema}
           films={store.films}
           onClose={closeDetail}
           onOpenItem={openItem}

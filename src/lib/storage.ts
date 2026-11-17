@@ -1,4 +1,4 @@
-import type { Answer, Film, FilmInfo, ReleaseInfo, Service, Status, Store } from "../types"
+import type { Answer, Film, FilmInfo, MyCinema, ReleaseInfo, Service, Status, Store } from "../types"
 import { QUESTIONS } from "./scoring"
 import { localDateStamp } from "./format"
 
@@ -45,6 +45,14 @@ function checkRelease(x: unknown): ReleaseInfo | null {
     }
   }
   return { date: x.date, local, pending: x.pending, checkedAt: x.checkedAt }
+}
+
+function checkCinema(x: unknown): Store["cinema"] {
+  if (!isObject(x) || !isIsoDate(x.updatedAt)) return undefined
+  const v = x.value
+  if (v === null) return { value: null, updatedAt: x.updatedAt }
+  if (isObject(v) && typeof v.id === "string" && typeof v.name === "string") return { value: { id: v.id, name: v.name }, updatedAt: x.updatedAt }
+  return undefined
 }
 
 function checkServices(x: unknown): Store["services"] {
@@ -158,6 +166,7 @@ function withFilms(store: Store, films: Film[], deleted: Record<string, string> 
   const next: Store = { version: 1, films }
   if (deleted && Object.keys(deleted).length) next.deleted = deleted
   if (store.services) next.services = store.services
+  if (store.cinema) next.cinema = store.cinema
   return next
 }
 
@@ -240,7 +249,9 @@ export function parseStore(data: unknown): Store | null {
     const check = checkFilm(entry)
     if (check.ok) films.push(check.film)
   }
-  const base: Store = { version: 1, films: [], ...(checkServices(data.services) ? { services: checkServices(data.services) } : {}) }
+  const services = checkServices(data.services)
+  const cinema = checkCinema(data.cinema)
+  const base: Store = { version: 1, films: [], ...(services ? { services } : {}), ...(cinema ? { cinema } : {}) }
   return withFilms(base, dedupe(films), checkDeleted(data.deleted))
 }
 
@@ -338,6 +349,14 @@ export function removeFilm(tmdbId: number): Store {
   return next
 }
 
+/** Mein Kino setzen (gilt auf allen Geräten). */
+export function setCinema(value: MyCinema | null): Store {
+  const store = load()
+  const next: Store = { ...withFilms(store, store.films), cinema: { value, updatedAt: nowIso() } }
+  save(next)
+  return next
+}
+
 /** Meine Streaming-Dienste setzen (gilt auf allen Geräten). */
 export function setServices(list: Service[]): Store {
   const store = load()
@@ -405,7 +424,7 @@ export async function importJson(file: File, mode: ImportMode = "merge"): Promis
     const keep = new Set(incoming.films.map((f) => f.tmdbId))
     const deleted = withoutDeleted(current.deleted, keep) ?? {}
     for (const f of current.films) if (!keep.has(f.tmdbId)) deleted[f.tmdbId] = now
-    const next = withFilms({ ...incoming, services: current.services }, incoming.films, deleted)
+    const next = withFilms({ ...incoming, services: current.services, cinema: current.cinema }, incoming.films, deleted)
     save(next)
     return { store: next, mode, added: incoming.films.length, updated: 0, total: incoming.films.length }
   }

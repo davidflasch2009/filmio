@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useState, type ReactNode, type RefObject } from "react"
-import type { Answer, Film, Service } from "../types"
+import type { Answer, Film, MyCinema, Service } from "../types"
 import { QUESTIONS } from "../lib/scoring"
 import { formatDate, formatRating, formatRuntime, localDateStamp } from "../lib/format"
 import { formatUpcomingLong, upcomingRelease } from "../lib/release"
@@ -14,6 +14,7 @@ import { useSwipeBack } from "../hooks/useSwipeBack"
 import StarRating from "./StarRating"
 import PosterRow from "./PosterRow"
 import TagEditor from "./TagEditor"
+import CinemaSessions from "./CinemaSessions"
 import {
   IconBookmark, IconCalendar, IconCheck, IconChevronLeft, IconFlag, IconFlagFilled, IconHistory, IconMinus, IconPlay, IconPlus, IconRepeat, IconTrash, IconX,
 } from "./Icons"
@@ -30,6 +31,8 @@ interface Props {
   region: Region
   /** Meine Streaming-Dienste – werden bei „Wo läuft der Film?“ hervorgehoben. */
   services: Service[]
+  /** Mein Kino – zeigt dessen Spielzeiten, wenn der Film dort läuft. */
+  cinema: MyCinema | null
   /** Alle gespeicherten Filme – für die Markierungen in Filmreihe und Empfehlungen. */
   films: Film[]
   onClose: () => void
@@ -113,7 +116,7 @@ function Portrait({ path, name }: { path: string | null; name: string }) {
 }
 
 export default function FilmDetail({
-  film, saved, instant = false, initialScroll = 0, scrollerRef, region, services, films,
+  film, saved, instant = false, initialScroll = 0, scrollerRef, region, services, cinema, films,
   onClose, onRate, onAddToWatchlist, onAddManyToWatchlist, onMoveToWatchlist, onDelete, onSaveNote, onSetFromNotes,
   onSaveWithoutRating, onOpenItem, onTogglePriority, onSetRewatches, onSetTags,
 }: Props) {
@@ -268,6 +271,10 @@ export default function FilmDetail({
             )}
           </div>
         </div>
+
+        {cinema && (
+          <CinemaSessions cinema={cinema} film={{ title: view.title, year: view.year, originalTitle: extras?.originalTitle }} />
+        )}
 
         {!saved && !full && loadFailed && (
           <p className="notice notice-error" role="alert">Die Filmdetails konnten nicht geladen werden. Bist du online?</p>

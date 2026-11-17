@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react"
-import type { Film, RegionCode, Service } from "../types"
+import type { Film, MyCinema, RegionCode, Service } from "../types"
+import { matchMovie, type CpxMovie } from "../lib/cineplexx"
 import { formatUpcomingShort, todayStamp, upcomingRelease, type Upcoming } from "../lib/release"
 import { smallImageUrl } from "../lib/tmdb"
 import FilmCard from "./FilmCard"
@@ -13,6 +14,9 @@ interface Props {
   services: Service[]
   /** tmdbId → meine Dienste, bei denen der Film gerade läuft. */
   streams: Map<number, Service[]>
+  /** Mein Kino + dessen Programm – für den Hinweis „Im Kino“. */
+  cinema: MyCinema | null
+  programme: CpxMovie[] | null
   onOpen: (film: Film) => void
   onMarkWatched: (film: Film) => void
   onFindFilms: () => void
@@ -26,7 +30,7 @@ function serviceLogos(list: Service[] | undefined) {
   return (list ?? []).filter((s) => s.logoPath).map((s) => ({ src: smallImageUrl(s.logoPath, "w92")!, name: s.name }))
 }
 
-export default function WatchlistView({ films, region, services, streams, onOpen, onMarkWatched, onFindFilms, onRandom, onOpenServices }: Props) {
+export default function WatchlistView({ films, region, services, streams, cinema, programme, onOpen, onMarkWatched, onFindFilms, onRandom, onOpenServices }: Props) {
   const [streamOnly, setStreamOnly] = useState(false)
   const [tag, setTag] = useState("")
 
@@ -51,6 +55,13 @@ export default function WatchlistView({ films, region, services, streams, onOpen
     [films],
   )
   if (tag && !tags.includes(tag)) setTag("")
+
+  const inCinema = useMemo(() => {
+    const ids = new Set<number>()
+    if (!cinema || !programme) return ids
+    for (const f of available) if (matchMovie(programme, f, cinema.id)) ids.add(f.tmdbId)
+    return ids
+  }, [available, cinema, programme])
 
   const filterOn = streamOnly && services.length > 0
   const shown = filterOn ? available.filter((f) => (streams.get(f.tmdbId)?.length ?? 0) > 0) : available
@@ -120,6 +131,7 @@ export default function WatchlistView({ films, region, services, streams, onOpen
                   posterPath={f.posterPath}
                   marker={f.priority ? PRIORITY_MARKER : undefined}
                   logos={serviceLogos(streams.get(f.tmdbId))}
+                  badge={inCinema.has(f.tmdbId) ? "Im Kino" : undefined}
                   onOpen={() => onOpen(f)}
                 >
                   <button type="button" className="pill pill-accent" onClick={() => onMarkWatched(f)} aria-label={`${f.title} als gesehen markieren`}>

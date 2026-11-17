@@ -832,3 +832,26 @@ div.card-main { cursor: default; }
 .switch:disabled { opacity: .45; cursor: default; }
 .push-test { color: var(--accent); }
 .push-message { margin: 10px 0 0; }
+
+/* ---------- Mein Kino: Spielzeiten ---------- */
+.cinema-days { display: flex; gap: 8px; overflow-x: auto; margin: 10px calc(-1 * var(--gutter-r)) 0 calc(-1 * var(--gutter-l)); padding: 0 var(--gutter-r) 2px var(--gutter-l); }
+.cinema-days .chip { flex: none; }
+.cinema-times { list-style: none; display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 0; padding: 0; }
+.cinema-time {
+  display: grid; justify-items: start; gap: 1px; min-width: 76px; padding: 9px 13px; border: 0; border-radius: 12px;
+  background: var(--surface); color: var(--fg); text-align: left; cursor: pointer; transition: transform .1s ease, background .2s ease;
+}
+.cinema-time strong { font-size: 18px; font-variant-numeric: tabular-nums; }
+.cinema-time span { color: var(--muted); font-size: 11.5px; font-weight: 600; }
+.cinema-time:active { transform: scale(0.96); }
+.cinema-time.open { background: var(--accent); color: var(--on-accent); }
+.cinema-time.open span { color: rgba(17,17,17,.7); }
+.cinema-panel { display: grid; gap: 10px; margin-top: 12px; padding: 14px 16px; border-radius: 16px; background: var(--surface); animation: help-in .2s ease both; }
+.cinema-panel-head { margin: 0; font-weight: 600; display: grid; gap: 2px; }
+.cinema-tags { color: var(--muted); font-size: 13px; font-weight: 500; }
+.price-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.price-list li { display: grid; gap: 1px; }
+.price-area { font-size: 13px; color: var(--muted); }
+.price-values { font-size: 15px; font-variant-numeric: tabular-nums; }
+.cinema-book { margin-top: 2px; }
+.cinema-source { margin-top: 10px; font-size: 12px; }

@@ -213,6 +213,8 @@ export interface WatchInfo {
 }
 
 export interface MovieExtras {
+  /** Originaltitel (für den Abgleich mit dem Kinoprogramm). */
+  originalTitle: string
   tagline: string
   directors: string[]
   cast: CastMember[]
@@ -298,6 +300,7 @@ export function loadMovieFull(id: number): Promise<MovieFull> {
     }
     const regions = de["watch/providers"]?.results ?? {}
     const extras: MovieExtras = {
+      originalTitle: (de.original_title ?? "").trim(),
       tagline: (de.tagline ?? "").trim(),
       directors: (de.credits?.crew ?? []).filter((c) => c.job === "Director").map((c) => c.name),
       cast: (de.credits?.cast ?? [])

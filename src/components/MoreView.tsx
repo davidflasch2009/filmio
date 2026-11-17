@@ -1,12 +1,12 @@
 import { useRef, useState, useSyncExternalStore, type FormEvent } from "react"
-import type { Service, Store } from "../types"
+import type { MyCinema, Service, Store } from "../types"
 import { exportJson, importJson, type ImportMode, type ImportResult } from "../lib/storage"
 import { GRID_SIZES, REGIONS, type Settings } from "../lib/settings"
 import { appVersion } from "../lib/updates"
 import { getSyncState, subscribeSync, syncNow, type SyncState } from "../lib/sync"
 import tmdbLogo from "../assets/tmdb-logo.svg"
 import ViewHeader from "./ViewHeader"
-import { IconChart, IconCheck, IconInfo, IconList, IconChevronRight, IconDownload, IconLogout, IconSync, IconTv, IconUpload, IconUser } from "./Icons"
+import { IconChart, IconCheck, IconInfo, IconList, IconTicket, IconChevronRight, IconDownload, IconLogout, IconSync, IconTv, IconUpload, IconUser } from "./Icons"
 import { smallImageUrl } from "../lib/tmdb"
 import NotificationSettings from "./NotificationSettings"
 
@@ -21,6 +21,8 @@ interface Props {
   services: Service[]
   onOpenServices: () => void
   onOpenLists: () => void
+  cinema: MyCinema | null
+  onOpenCinema: () => void
 }
 
 type Message = { kind: "ok" | "error"; text: string }
@@ -37,7 +39,7 @@ function syncText(state: SyncState): string {
   return `Abgeglichen · ${time}`
 }
 
-export default function MoreView({ store, account, onSignOut, onImported, settings, onSettingsChange, onOpenStats, services, onOpenServices, onOpenLists }: Props) {
+export default function MoreView({ store, account, onSignOut, onImported, settings, onSettingsChange, onOpenStats, services, onOpenServices, onOpenLists, cinema, onOpenCinema }: Props) {
   const { gridSize, region, questionHelp } = settings
   const fileRef = useRef<HTMLInputElement>(null)
   const [file, setFile] = useState<File | null>(null)
@@ -124,6 +126,14 @@ export default function MoreView({ store, account, onSignOut, onImported, settin
           <span className="row-text">
             Meine Listen
             {tagCount > 0 && <span className="row-sub">{tagCount === 1 ? "1 Liste" : `${tagCount} Listen`}</span>}
+          </span>
+          <IconChevronRight className="row-chevron" />
+        </button>
+        <button type="button" className="group-row row-button" onClick={onOpenCinema}>
+          <span className="row-icon"><IconTicket /></span>
+          <span className="row-text">
+            Mein Kino
+            <span className="row-sub">{cinema ? cinema.name : "Keins ausgewählt"}</span>
           </span>
           <IconChevronRight className="row-chevron" />
         </button>

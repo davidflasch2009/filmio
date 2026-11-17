@@ -52,6 +52,13 @@ export interface Store {
   deleted?: Record<string, string>
   /** Meine Streaming-Dienste (für alle Geräte gleich). */
   services?: { list: Service[]; updatedAt: string }
+  /** Mein Kino (Cineplexx Österreich); null = keins gewählt. */
+  cinema?: { value: MyCinema | null; updatedAt: string }
+}
+
+export interface MyCinema {
+  id: string
+  name: string
 }
 
 /** Die von TMDB übernommenen (gecachten) Felder eines Films. */
