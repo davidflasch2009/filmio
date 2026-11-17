@@ -644,3 +644,53 @@ div.card-main { cursor: default; }
 .row-button:disabled { opacity: 0.5; cursor: default; }
 .row-danger { color: var(--no); }
 .row-danger .row-icon { background: rgba(255, 105, 97, 0.15); color: var(--no); }
+
+/* ---------- Meine Dienste ---------- */
+.services-body { display: grid; gap: 14px; }
+.services-hint { margin: 0 4px; }
+.services-list { list-style: none; }
+.services-list li + li .group-row { border-top: 1px solid var(--line); }
+.service-row { padding-top: 10px; padding-bottom: 10px; }
+.service-logo { width: 36px; height: 36px; border-radius: 9px; flex: none; object-fit: cover; background: var(--surface-2); }
+.service-logo-empty { display: grid; place-items: center; color: var(--muted); font-weight: 700; }
+.service-check {
+  display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; flex: none;
+  border: 2px solid var(--surface-3); color: var(--on-accent);
+}
+.service-check.on { background: var(--accent); border-color: var(--accent); }
+.service-check .ic { width: 15px; height: 15px; stroke-width: 2.6; }
+.services-summary { display: flex; gap: 4px; flex: none; }
+.services-summary img { width: 22px; height: 22px; border-radius: 6px; }
+
+/* ---------- Watchlist: Dienste-Logos, Kommt bald ---------- */
+.poster-logos { position: absolute; left: 6px; bottom: 6px; display: flex; gap: 4px; }
+.poster-logos img { width: 24px; height: 24px; border-radius: 6px; box-shadow: 0 2px 8px rgba(0,0,0,.55); background: var(--surface-2); }
+[data-grid="s"] .poster-logos { left: 4px; bottom: 4px; }
+[data-grid="s"] .poster-logos img { width: 18px; height: 18px; border-radius: 4px; }
+[data-grid="l"] .poster-logos img { width: 30px; height: 30px; border-radius: 8px; }
+.watchlist-upcoming { margin-top: 30px; }
+.section-title { margin: 0 0 12px; font: 700 20px/1.2 var(--font-display); letter-spacing: -0.01em; }
+.empty-small { padding: 28px 0; }
+
+/* ---------- Detailseite: Priorität, Termin, mehrfach gesehen, meine Dienste ---------- */
+.action-on { background: var(--accent-soft); }
+.release-chip {
+  display: inline-flex; align-items: center; gap: 6px; margin-top: 10px; padding: 5px 11px 5px 9px;
+  border-radius: 999px; background: rgba(0, 0, 0, 0.55); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  color: var(--accent); font-size: 13.5px; font-weight: 600;
+}
+.release-chip .ic { width: 16px; height: 16px; }
+.viewings { list-style: none; margin: 10px 0 0; padding: 0; border-radius: 14px; background: var(--surface); overflow: hidden; }
+.viewings li { display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 6px 8px 6px 16px; }
+.viewings li + li { border-top: 1px solid var(--line); }
+.viewing-label { flex: 1; min-width: 0; color: var(--fg-2); font-size: 15px; }
+.viewing-date { padding-right: 8px; color: var(--muted); font-size: 15px; font-variant-numeric: tabular-nums; }
+.viewing-input {
+  height: 34px; padding: 0 10px; border: 0; border-radius: 9px; background: var(--surface-2); color: var(--fg);
+  font: inherit; font-size: 15px; color-scheme: dark;
+}
+.viewing-remove { display: grid; place-items: center; width: 34px; height: 34px; border: 0; border-radius: 50%; background: none; color: var(--muted); }
+.viewing-remove .ic { width: 17px; height: 17px; }
+.providers-list li.provider-mine img { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent); }
+/* Zwei Zeilen erlaubt, z.B. „Nochmal gesehen“ */
+.action-btn span { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 1.2; }

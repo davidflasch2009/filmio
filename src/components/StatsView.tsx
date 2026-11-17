@@ -61,7 +61,10 @@ function StatTile({ label, value, unit }: { label: string; value: string; unit?:
 
 const STAR_STEPS = [5, 4.5, 4, 3.5, 3, 2.5, 2, 1.5, 1, 0.5]
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
-const hours = (films: Film[]) => Math.round(films.reduce((s, f) => s + (f.runtime ?? 0), 0) / 60)
+/** Wie oft gesehen (gesehene Filme: 1 + weitere Male). */
+const viewings = (f: Film) => (f.status === "watched" ? 1 + (f.rewatches?.length ?? 0) : 1)
+/** Stunden – bei gesehenen Filmen jedes Mal mitgezählt. */
+const hours = (films: Film[]) => Math.round(films.reduce((s, f) => s + (f.runtime ?? 0) * viewings(f), 0) / 60)
 
 /** Statistik über die eigene Filmliste. */
 export default function StatsView({ films, onClose, onOpen }: Props) {
@@ -130,7 +133,15 @@ export default function StatsView({ films, onClose, onOpen }: Props) {
       .sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0) || a.title.localeCompare(b.title, "de"))
       .slice(0, 12)
 
-    return { watched, rated, watchlist, average, stars, genres, decades, questions, answeredCount: answered.length, best }
+    // Am öftesten gesehen (nur Filme, die du mehr als einmal gesehen hast).
+    const repeated = watched.filter((f) => viewings(f) > 1)
+    const mostWatched: BarRow[] = [...repeated]
+      .sort((a, b) => viewings(b) - viewings(a) || a.title.localeCompare(b.title, "de"))
+      .slice(0, 8)
+      .map((f) => ({ key: String(f.tmdbId), label: f.title, value: viewings(f), figure: `${viewings(f)}×`, title: `${f.title}: ${viewings(f)}-mal gesehen` }))
+    const totalViewings = watched.reduce((s, f) => s + viewings(f), 0)
+
+    return { watched, rated, watchlist, average, mostWatched, totalViewings, stars, genres, decades, questions, answeredCount: answered.length, best }
   }, [films])
 
   const bestItems: TmdbListItem[] = stats.best.map((f) => ({ id: f.tmdbId, title: f.title, poster_path: f.posterPath }))
@@ -188,6 +199,14 @@ export default function StatsView({ films, onClose, onOpen }: Props) {
               <h3>Deine häufigsten Ja-Antworten</h3>
               <p className="hint stats-note">Aus {stats.answeredCount} per Fragebogen bewerteten Filmen</p>
               <BarList rows={stats.questions} stacked />
+            </section>
+          )}
+
+          {stats.mostWatched.length > 0 && (
+            <section className="stats-card">
+              <h3>Am öftesten gesehen</h3>
+              <p className="hint stats-note">{stats.totalViewings} Filmabende insgesamt</p>
+              <BarList rows={stats.mostWatched} />
             </section>
           )}
 

@@ -23,9 +23,11 @@ export function mergeStores(local: Store, remote: Store): Store {
     if (!b) return a
     const winner = changedAt(b) > changedAt(a) ? b : a
     const other = winner === a ? b : a
-    return winner.backdropPath === undefined && other.backdropPath !== undefined
-      ? { ...winner, backdropPath: other.backdropPath }
-      : winner
+    // Automatisch nachgeladene Felder (zählen nicht als Änderung) vom anderen Stand ergänzen.
+    let out = winner
+    if (out.backdropPath === undefined && other.backdropPath !== undefined) out = { ...out, backdropPath: other.backdropPath }
+    if (other.release && (!out.release || other.release.checkedAt > out.release.checkedAt)) out = { ...out, release: other.release }
+    return out
   }
 
   // Reihenfolge der lokalen Liste beibehalten, neue Filme vom Server hinten anhängen.
@@ -43,14 +45,19 @@ export function mergeStores(local: Store, remote: Store): Store {
   })
   for (const f of alive) delete deleted[f.tmdbId]
 
-  return Object.keys(deleted).length ? { version: 1, films: alive, deleted } : { version: 1, films: alive }
+  const merged: Store = { version: 1, films: alive }
+  if (Object.keys(deleted).length) merged.deleted = deleted
+  const services = !local.services ? remote.services : !remote.services ? local.services
+    : remote.services.updatedAt > local.services.updatedAt ? remote.services : local.services
+  if (services) merged.services = services
+  return merged
 }
 
 /** Vergleichbare Form (Reihenfolge der Filme spielt für den Inhalt keine Rolle). */
 function fingerprint(store: Store): string {
   const films = [...store.films].sort((a, b) => a.tmdbId - b.tmdbId)
   const deleted = Object.entries(store.deleted ?? {}).sort(([a], [b]) => Number(a) - Number(b))
-  return JSON.stringify([films, deleted])
+  return JSON.stringify([films, deleted, store.services ?? null])
 }
 
 // ---------------------------------------------------------------------------

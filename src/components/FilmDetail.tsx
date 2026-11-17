@@ -1,7 +1,8 @@
 import { useEffect, useLayoutEffect, useState, type ReactNode, type RefObject } from "react"
-import type { Answer, Film } from "../types"
+import type { Answer, Film, Service } from "../types"
 import { QUESTIONS } from "../lib/scoring"
-import { formatDate, formatRating, formatRuntime } from "../lib/format"
+import { formatDate, formatRating, formatRuntime, localDateStamp } from "../lib/format"
+import { formatUpcomingLong, upcomingRelease } from "../lib/release"
 import { newFilm } from "../lib/storage"
 import { REGIONS, type Region } from "../lib/settings"
 import {
@@ -12,7 +13,9 @@ import { useOnline } from "../hooks/useOnline"
 import { useSwipeBack } from "../hooks/useSwipeBack"
 import StarRating from "./StarRating"
 import PosterRow from "./PosterRow"
-import { IconBookmark, IconCheck, IconChevronLeft, IconHistory, IconMinus, IconPlay, IconPlus, IconTrash, IconX } from "./Icons"
+import {
+  IconBookmark, IconCalendar, IconCheck, IconChevronLeft, IconFlag, IconFlagFilled, IconHistory, IconMinus, IconPlay, IconPlus, IconRepeat, IconTrash, IconX,
+} from "./Icons"
 
 interface Props {
   film: Film
@@ -24,6 +27,8 @@ interface Props {
   initialScroll?: number
   scrollerRef: RefObject<HTMLDivElement>
   region: Region
+  /** Meine Streaming-Dienste – werden bei „Wo läuft der Film?“ hervorgehoben. */
+  services: Service[]
   /** Alle gespeicherten Filme – für die Markierungen in Filmreihe und Empfehlungen. */
   films: Film[]
   onClose: () => void
@@ -38,6 +43,16 @@ interface Props {
   onSaveWithoutRating: (film: Film) => void
   /** Einen anderen Film öffnen (aus Filmreihe oder Empfehlungen). */
   onOpenItem: (item: TmdbListItem) => void
+  onTogglePriority: (film: Film) => void
+  /** Weitere Male gesehen: neue Liste der Daten (ISO). */
+  onSetRewatches: (film: Film, rewatches: string[]) => void
+}
+
+/** "2026-11-17" → ISO um 12 Uhr Ortszeit (damit das Datum in keiner Zeitzone kippt). */
+function dayToIso(day: string): string | null {
+  const [y, m, d] = day.split("-").map(Number)
+  if (!y || !m || !d) return null
+  return new Date(y, m - 1, d, 12).toISOString()
 }
 
 const ANSWER_LABEL: Record<Answer, string> = { ja: "Ja", neutral: "Neutral", nein: "Nein" }
@@ -65,13 +80,16 @@ function Hero({ film }: { film: Film }) {
   return <div className="hero-img hero-empty" />
 }
 
-function ProviderLogos({ label, providers }: { label: string; providers: Provider[] }) {
+function ProviderLogos({ label, providers, mine }: { label: string; providers: Provider[]; mine?: Set<number> }) {
+  const isMine = (p: Provider) => mine?.has(p.id) ?? false
+  // Meine Dienste zuerst.
+  const sorted = [...providers].sort((a, b) => Number(isMine(b)) - Number(isMine(a)))
   return (
     <div className="providers">
       <span className="providers-label">{label}</span>
       <ul className="providers-list">
-        {providers.map((p) => (
-          <li key={p.id} title={p.name}>
+        {sorted.map((p) => (
+          <li key={p.id} title={isMine(p) ? `${p.name} – dein Dienst` : p.name} className={isMine(p) ? "provider-mine" : undefined}>
             {p.logoPath
               ? <img src={smallImageUrl(p.logoPath, "w92")!} alt={p.name} loading="lazy" />
               : <span className="provider-fallback">{p.name}</span>}
@@ -93,9 +111,9 @@ function Portrait({ path, name }: { path: string | null; name: string }) {
 }
 
 export default function FilmDetail({
-  film, saved, instant = false, initialScroll = 0, scrollerRef, region, films,
+  film, saved, instant = false, initialScroll = 0, scrollerRef, region, services, films,
   onClose, onRate, onAddToWatchlist, onAddManyToWatchlist, onMoveToWatchlist, onDelete, onSaveNote, onSetFromNotes,
-  onSaveWithoutRating, onOpenItem,
+  onSaveWithoutRating, onOpenItem, onTogglePriority, onSetRewatches,
 }: Props) {
   const online = useOnline()
   useSwipeBack(scrollerRef, onClose)
@@ -152,6 +170,11 @@ export default function FilmDetail({
 
   const extras = full?.extras
   const watch = extras?.watch[region]
+  const myIds = new Set(services.flatMap((s) => s.ids))
+  const onMyService = watch?.stream.some((p) => myIds.has(p.id)) ?? false
+  const upcoming = film.status === "watched" && saved ? null
+    : upcomingRelease({ release: film.release ?? full?.info.release, year: view.year }, region)
+  const rewatches = film.rewatches ?? []
   const regionLabel = REGIONS.find((r) => r.id === region)?.label ?? region
   const longOverview = view.overview.length > 320
 
@@ -180,6 +203,7 @@ export default function FilmDetail({
           {saved && <span className="hero-status">{earlier ? "Früher gesehen" : film.status === "watched" ? "Gesehen" : "Watchlist"}</span>}
           <h2 className="detail-title">{view.title}</h2>
           {meta && <p className="detail-meta">{meta}</p>}
+          {upcoming && <p className="release-chip"><IconCalendar />{formatUpcomingLong(upcoming)}</p>}
         </div>
       </div>
 
@@ -214,6 +238,21 @@ export default function FilmDetail({
                 <IconHistory /><span>Früher gesehen</span>
               </button>
             )}
+            {saved && !watched && (
+              <button
+                type="button"
+                className={`action-btn${film.priority ? " action-on" : ""}`}
+                aria-pressed={!!film.priority}
+                onClick={() => onTogglePriority(film)}
+              >
+                {film.priority ? <IconFlagFilled /> : <IconFlag />}<span>Priorität</span>
+              </button>
+            )}
+            {watched && (
+              <button type="button" className="action-btn" onClick={() => onSetRewatches(film, [...rewatches, new Date().toISOString()])}>
+                <IconRepeat /><span>Nochmal gesehen</span>
+              </button>
+            )}
             {watched && (
               <button type="button" className="action-btn" onClick={() => onMoveToWatchlist(film)}>
                 <IconBookmark /><span>Auf Watchlist</span>
@@ -243,6 +282,45 @@ export default function FilmDetail({
                 {expanded ? "Weniger" : "Mehr"}
               </button>
             )}
+          </section>
+        )}
+
+        {watched && rewatches.length > 0 && (
+          <section className="detail-section">
+            <div className="section-head">
+              <h3>Gesehen</h3>
+              <span className="section-note">{rewatches.length + 1}×</span>
+            </div>
+            <ul className="viewings">
+              <li>
+                <span className="viewing-label">Zum ersten Mal</span>
+                <span className="viewing-date">{formatDate(film.watchedAt) ?? "Datum unbekannt"}</span>
+              </li>
+              {rewatches.map((iso, i) => (
+                <li key={i}>
+                  <span className="viewing-label">{i + 2}. Mal</span>
+                  <input
+                    type="date"
+                    className="viewing-input"
+                    aria-label={`Datum ${i + 2}. Mal`}
+                    value={localDateStamp(new Date(iso))}
+                    max={localDateStamp()}
+                    onChange={(e) => {
+                      const next = dayToIso(e.target.value)
+                      if (next) onSetRewatches(film, rewatches.map((r, j) => (j === i ? next : r)))
+                    }}
+                  />
+                  <button
+                    type="button"
+                    className="viewing-remove"
+                    aria-label={`${i + 2}. Mal entfernen`}
+                    onClick={() => onSetRewatches(film, rewatches.filter((_, j) => j !== i))}
+                  >
+                    <IconX />
+                  </button>
+                </li>
+              ))}
+            </ul>
           </section>
         )}
 
@@ -296,13 +374,15 @@ export default function FilmDetail({
           <section className="detail-section">
             <div className="section-head">
               <h3>Wo läuft der Film?</h3>
-              {(watch.stream.length > 0 || watch.rentBuy.length > 0) && <span className="section-note">Quelle: JustWatch</span>}
+              {(watch.stream.length > 0 || watch.rentBuy.length > 0) && (
+                <span className="section-note">Quelle: JustWatch</span>
+              )}
             </div>
             {watch.stream.length === 0 && watch.rentBuy.length === 0 ? (
               <p className="hint">In {regionLabel} derzeit bei keinem Anbieter.</p>
             ) : (
               <a className="providers-link" href={watch.link ?? undefined} target="_blank" rel="noopener noreferrer">
-                {watch.stream.length > 0 && <ProviderLogos label="Im Abo" providers={watch.stream} />}
+                {watch.stream.length > 0 && <ProviderLogos label={onMyService ? "Im Abo · läuft bei dir" : "Im Abo"} providers={watch.stream} mine={myIds} />}
                 {watch.rentBuy.length > 0 && <ProviderLogos label="Leihen oder kaufen" providers={watch.rentBuy} />}
               </a>
             )}

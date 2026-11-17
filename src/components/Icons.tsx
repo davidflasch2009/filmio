@@ -72,3 +72,18 @@ export const IconSync = (p: IconProps) => (
 export const IconLogout = (p: IconProps) => (
   <Svg {...p}><path d="M14 4.5H7.5a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2H14" /><path d="M11 12h9m-3-3.5 3.5 3.5-3.5 3.5" /></Svg>
 )
+export const IconFlag = (p: IconProps) => (
+  <Svg {...p}><path d="M6 21V4.5" /><path d="M6 4.5h10.5l-2 4 2 4H6" /></Svg>
+)
+export const IconFlagFilled = (p: IconProps) => (
+  <Svg {...p}><path d="M6 21V4.5" /><path d="M6 4.5h10.5l-2 4 2 4H6z" fill="currentColor" /></Svg>
+)
+export const IconTv = (p: IconProps) => (
+  <Svg {...p}><rect x="3.5" y="5.5" width="17" height="11.5" rx="2" /><path d="M8.5 20h7" /></Svg>
+)
+export const IconRepeat = (p: IconProps) => (
+  <Svg {...p}><path d="M17 3.5 20 6.5l-3 3" /><path d="M4 11.5v-1a4 4 0 0 1 4-4h12" /><path d="m7 20.5-3-3 3-3" /><path d="M20 12.5v1a4 4 0 0 1-4 4H4" /></Svg>
+)
+export const IconCalendar = (p: IconProps) => (
+  <Svg {...p}><rect x="4" y="5.5" width="16" height="14.5" rx="2.5" /><path d="M4 10h16M8.5 3.5v4M15.5 3.5v4" /></Svg>
+)

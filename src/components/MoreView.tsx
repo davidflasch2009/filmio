@@ -1,12 +1,13 @@
 import { useRef, useState, useSyncExternalStore, type FormEvent } from "react"
-import type { Store } from "../types"
+import type { Service, Store } from "../types"
 import { exportJson, importJson, type ImportMode, type ImportResult } from "../lib/storage"
 import { GRID_SIZES, REGIONS, type Settings } from "../lib/settings"
 import { appVersion } from "../lib/updates"
 import { getSyncState, subscribeSync, syncNow, type SyncState } from "../lib/sync"
 import tmdbLogo from "../assets/tmdb-logo.svg"
 import ViewHeader from "./ViewHeader"
-import { IconChart, IconCheck, IconChevronRight, IconDownload, IconLogout, IconSync, IconUpload, IconUser } from "./Icons"
+import { IconChart, IconCheck, IconChevronRight, IconDownload, IconLogout, IconSync, IconTv, IconUpload, IconUser } from "./Icons"
+import { smallImageUrl } from "../lib/tmdb"
 
 interface Props {
   store: Store
@@ -16,6 +17,8 @@ interface Props {
   settings: Settings
   onSettingsChange: (patch: Partial<Settings>) => void
   onOpenStats: () => void
+  services: Service[]
+  onOpenServices: () => void
 }
 
 type Message = { kind: "ok" | "error"; text: string }
@@ -32,7 +35,7 @@ function syncText(state: SyncState): string {
   return `Abgeglichen · ${time}`
 }
 
-export default function MoreView({ store, account, onSignOut, onImported, settings, onSettingsChange, onOpenStats }: Props) {
+export default function MoreView({ store, account, onSignOut, onImported, settings, onSettingsChange, onOpenStats, services, onOpenServices }: Props) {
   const { gridSize, region } = settings
   const fileRef = useRef<HTMLInputElement>(null)
   const [file, setFile] = useState<File | null>(null)
@@ -111,6 +114,19 @@ export default function MoreView({ store, account, onSignOut, onImported, settin
         <button type="button" className="group-row row-button" onClick={onOpenStats}>
           <span className="row-icon"><IconChart /></span>
           <span className="row-text">Statistik</span>
+          <IconChevronRight className="row-chevron" />
+        </button>
+        <button type="button" className="group-row row-button" onClick={onOpenServices}>
+          <span className="row-icon"><IconTv /></span>
+          <span className="row-text">
+            Meine Streaming-Dienste
+            <span className="row-sub">{services.length ? services.map((s) => s.name).join(", ") : "Noch keine ausgewählt"}</span>
+          </span>
+          {services.some((s) => s.logoPath) && (
+            <span className="services-summary" aria-hidden="true">
+              {services.filter((s) => s.logoPath).slice(0, 3).map((s) => <img key={s.id} src={smallImageUrl(s.logoPath, "w92")!} alt="" />)}
+            </span>
+          )}
           <IconChevronRight className="row-chevron" />
         </button>
       </div>

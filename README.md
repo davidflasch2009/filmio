@@ -91,7 +91,12 @@ src/
 - **Suche** ohne Begriff = Stöbern wie in einer Streaming-App: Trends, Empfehlungen zu einem Film, der dir gefallen hat, Kino, Genres, Bestbewertet
 - **Detailseite**: Szenenbild, Handlung, Notiz, Antwortprofil, *Wo läuft der Film?* (Streaming-Anbieter per TMDB/JustWatch, Land unter Mehr wählbar),
   Regie und Besetzung, Trailer, Filmreihe (mit „Fehlende auf die Watchlist“), ähnliche Filme; vom linken Rand wischen = zurück
-- **Würfel** auf der Watchlist, filterbar nach Genre und „Unter 2 Std.“
+- **Watchlist**: Priorität (Fähnchen, steht oben), **„Kommt bald“** für Filme, die im gewählten Land noch nicht erschienen sind
+  (Kinostart bzw. digitaler Start laut TMDB, Termine werden alle paar Tage aufgefrischt)
+- **Meine Streaming-Dienste** (unter Mehr, auf allen Geräten gleich): Logos auf den Watchlist-Postern, Filter „Läuft bei mir“,
+  Hervorhebung auf der Detailseite
+- **Würfel** auf der Watchlist, filterbar nach Genre, „Unter 2 Std.“ und „Läuft bei mir“ (ohne Filme, die noch nicht draußen sind)
+- **Mehrfach gesehen**: „Nochmal gesehen“ auf der Detailseite, Daten änderbar; zählt in Statistik und „Zuletzt gesehen“
 - **Statistik** unter Mehr: Anzahl, Stunden, Schnitt, Sterne-Verteilung, beste Filme, Lieblingsgenres, Jahrzehnte, häufigste Ja-Antworten
 
 ## Design

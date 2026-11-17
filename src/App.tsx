@@ -1,8 +1,11 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react"
-import type { Film, Store } from "./types"
-import { addFilm, load, newFilm, removeFilm, STORAGE_KEY, updateFilm, type ImportResult } from "./lib/storage"
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
+import type { Film, Service, Store } from "./types"
+import { addFilm, load, newFilm, removeFilm, setServices, STORAGE_KEY, updateFilm, type ImportResult } from "./lib/storage"
 import { formatRating } from "./lib/format"
-import { fetchBackdropPath, hasToken, listItemToInfo, type TmdbListItem } from "./lib/tmdb"
+import { fetchFilmMeta, hasToken, listItemToInfo, type TmdbListItem } from "./lib/tmdb"
+import { releaseNeedsRefresh, upcomingRelease } from "./lib/release"
+import { useStreams } from "./hooks/useStreams"
+import ServicesPicker from "./components/ServicesPicker"
 import { useOnline } from "./hooks/useOnline"
 import { loadSettings, saveSettings, type Settings } from "./lib/settings"
 import TabBar, { type Tab } from "./components/TabBar"
@@ -82,18 +85,24 @@ function FilmApp({ account, onSignOut }: { account: string; onSignOut: () => voi
   useEffect(() => startSync({ onRemoteChange: () => setStore(load()), onSignedOut: onSignOut }), [onSignOut])
 
   // Szenenbilder für Filme nachladen, die noch keins haben (z.B. aus einem Import oder älteren Versionen).
-  const needsBackdrops = store.films.some((f) => f.backdropPath === undefined)
+  // Ebenso die Erscheinungstermine – bei Filmen, die noch nicht draußen sind, alle paar Tage neu (Termine verschieben sich).
+  // Beides zählt nicht als eigene Änderung (touch: false).
+  const region = settings.region
+  const needsMeta = (f: Film) => f.backdropPath === undefined || releaseNeedsRefresh(f, region)
+  const metaPending = store.films.some(needsMeta)
   useEffect(() => {
-    if (!online || !hasToken || !needsBackdrops) return
+    if (!online || !hasToken || !metaPending) return
     let cancelled = false
-    const queue = load().films.filter((f) => f.backdropPath === undefined).map((f) => f.tmdbId)
+    const queue = load().films.filter(needsMeta).map((f) => f.tmdbId)
     const worker = async () => {
       while (queue.length && !cancelled) {
         const id = queue.shift()!
         try {
-          const backdropPath = await fetchBackdropPath(id)
+          const meta = await fetchFilmMeta(id)
           if (cancelled) return
-          setStore(updateFilm(id, { backdropPath }, { touch: false }))
+          // Gibt es den Film bei TMDB nicht (mehr), nicht endlos weiterfragen.
+          const patch = meta ?? { backdropPath: null, release: { date: null, local: {}, pending: false, checkedAt: new Date().toISOString() } }
+          setStore(updateFilm(id, patch, { touch: false }))
         } catch {
           // Netzfehler o.ä.: beim nächsten Start erneut versuchen.
         }
@@ -101,7 +110,14 @@ function FilmApp({ account, onSignOut }: { account: string; onSignOut: () => voi
     }
     void Promise.all([worker(), worker(), worker()])
     return () => { cancelled = true }
-  }, [online, needsBackdrops])
+    // needsMeta hängt nur von region ab.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [online, metaPending, region])
+
+  // Meine Streaming-Dienste und wo die Watchlist-Filme gerade laufen.
+  const services = useMemo<Service[]>(() => store.services?.list ?? [], [store.services])
+  const streams = useStreams(store.films, services, region, online)
+  const [servicesOpen, setServicesOpen] = useState(false)
 
   useEffect(() => {
     if (!toast) return
@@ -109,7 +125,7 @@ function FilmApp({ account, onSignOut }: { account: string; onSignOut: () => voi
     return () => clearTimeout(t)
   }, [toast])
 
-  const overlayOpen = details.length > 0 || rating !== null || picking || statsOpen
+  const overlayOpen = details.length > 0 || rating !== null || picking || statsOpen || servicesOpen
   useEffect(() => {
     document.body.classList.toggle("no-scroll", overlayOpen)
   }, [overlayOpen])
@@ -170,6 +186,7 @@ function FilmApp({ account, onSignOut }: { account: string; onSignOut: () => voi
       watchedAt: existing?.status === "watched" ? existing.watchedAt : now,
       // Jetzt in der App per Fragebogen bewertet.
       fromNotes: false,
+      priority: undefined,
     }
     if (persist(() => addFilm(updated))) {
       setRating(null)
@@ -188,6 +205,7 @@ function FilmApp({ account, onSignOut }: { account: string; onSignOut: () => voi
       rating: null,
       answers: null,
       fromNotes: false,
+      priority: undefined,
       addedAt: existing?.addedAt ?? nowIso(),
       // Wann genau, ist unbekannt – kein erfundenes Datum.
       watchedAt: existing?.status === "watched" ? existing.watchedAt : null,
@@ -202,7 +220,7 @@ function FilmApp({ account, onSignOut }: { account: string; onSignOut: () => voi
   function moveToWatchlist(film: Film) {
     if (film.rating !== null &&
       !window.confirm(`„${film.title}“ zurück auf die Watchlist schieben? Bewertung und Antworten werden entfernt.`)) return
-    if (persist(() => updateFilm(film.tmdbId, { status: "watchlist", rating: null, answers: null, watchedAt: null, fromNotes: false }))) {
+    if (persist(() => updateFilm(film.tmdbId, { status: "watchlist", rating: null, answers: null, watchedAt: null, fromNotes: false, rewatches: [] }))) {
       notify(`„${film.title}“ ist wieder auf der Watchlist.`)
     }
   }
@@ -224,6 +242,24 @@ function FilmApp({ account, onSignOut }: { account: string; onSignOut: () => voi
 
   function setFromNotes(film: Film, fromNotes: boolean) {
     persist(() => updateFilm(film.tmdbId, { fromNotes }))
+  }
+
+  function togglePriority(film: Film) {
+    if (persist(() => updateFilm(film.tmdbId, { priority: film.priority ? undefined : true }))) {
+      notify(film.priority ? "Priorität entfernt" : `„${film.title}“ steht jetzt oben auf der Watchlist.`)
+    }
+  }
+
+  function setRewatches(film: Film, rewatches: string[]) {
+    const added = rewatches.length > (film.rewatches?.length ?? 0)
+    const sorted = [...rewatches].sort()
+    if (persist(() => updateFilm(film.tmdbId, { rewatches: sorted })) && added) {
+      notify(`${sorted.length + 1}× gesehen`, () => { if (persist(() => updateFilm(film.tmdbId, { rewatches: film.rewatches ?? [] }))) setToast(null) })
+    }
+  }
+
+  function changeServices(list: Service[]) {
+    persist(() => setServices(list))
   }
 
   function changeSettings(patch: Partial<Settings>) {
@@ -285,10 +321,14 @@ function FilmApp({ account, onSignOut }: { account: string; onSignOut: () => voi
         <div hidden={tab !== "watchlist"}>
           <WatchlistView
             films={store.films}
+            region={region}
+            services={services}
+            streams={streams}
             onOpen={openSaved}
             onMarkWatched={setRating}
             onFindFilms={() => changeTab("search")}
             onRandom={() => setPicking(true)}
+            onOpenServices={() => setServicesOpen(true)}
           />
         </div>
         <div hidden={tab !== "earlier"}>
@@ -306,13 +346,27 @@ function FilmApp({ account, onSignOut }: { account: string; onSignOut: () => voi
           />
         </div>
         <div hidden={tab !== "more"}>
-          <MoreView store={store} account={account} onSignOut={logOut} onImported={onImported} settings={settings} onSettingsChange={changeSettings} onOpenStats={() => setStatsOpen(true)} />
+          <MoreView
+            store={store}
+            account={account}
+            onSignOut={logOut}
+            onImported={onImported}
+            settings={settings}
+            onSettingsChange={changeSettings}
+            onOpenStats={() => setStatsOpen(true)}
+            services={services}
+            onOpenServices={() => setServicesOpen(true)}
+          />
         </div>
       </main>
 
       <TabBar active={tab} onChange={changeTab} />
 
       {statsOpen && <StatsView films={store.films} onClose={() => setStatsOpen(false)} onOpen={openSaved} />}
+
+      {servicesOpen && (
+        <ServicesPicker selected={services} region={region} onChange={changeServices} onClose={() => setServicesOpen(false)} />
+      )}
 
       {detailFilm && (
         <FilmDetail
@@ -323,6 +377,7 @@ function FilmApp({ account, onSignOut }: { account: string; onSignOut: () => voi
           initialScroll={detail?.scroll}
           scrollerRef={detailRef}
           region={settings.region}
+          services={services}
           films={store.films}
           onClose={closeDetail}
           onOpenItem={openItem}
@@ -334,6 +389,8 @@ function FilmApp({ account, onSignOut }: { account: string; onSignOut: () => voi
           onSaveNote={saveNote}
           onSetFromNotes={setFromNotes}
           onSaveWithoutRating={saveWithoutRating}
+          onTogglePriority={togglePriority}
+          onSetRewatches={setRewatches}
         />
       )}
 
@@ -349,7 +406,9 @@ function FilmApp({ account, onSignOut }: { account: string; onSignOut: () => voi
 
       {picking && (
         <RandomPick
-          films={store.films.filter((f) => f.status === "watchlist")}
+          films={store.films.filter((f) => f.status === "watchlist" && !upcomingRelease(f, region))}
+          streams={streams}
+          hasServices={services.length > 0}
           onClose={() => setPicking(false)}
           onOpen={(film) => { setPicking(false); openSaved(film) }}
         />

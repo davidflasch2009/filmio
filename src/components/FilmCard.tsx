@@ -55,17 +55,24 @@ interface Props {
   badge?: ReactNode
   /** Kleines Symbol in der Poster-Ecke (z.B. „aus meinen Notizen“); label für Screenreader/Tooltip. */
   marker?: { icon: ReactNode; label: string }
+  /** Logos (z.B. meine Dienste, bei denen der Film läuft) unten auf dem Poster. */
+  logos?: { src: string; name: string }[]
   onOpen?: () => void
   children?: ReactNode
 }
 
 /** Karte für Listen und Suchtreffer: Poster, Titel, Sterne + Jahr, optional Hinweis und Buttons. */
-export default function FilmCard({ title, year, posterPath, rating, badge, marker, onOpen, children }: Props) {
+export default function FilmCard({ title, year, posterPath, rating, badge, marker, logos, onOpen, children }: Props) {
   const body = (
     <>
       <span className="poster-wrap">
         <Poster path={posterPath} title={title} />
         {marker && <span className="poster-marker" role="img" aria-label={marker.label} title={marker.label}>{marker.icon}</span>}
+        {logos && logos.length > 0 && (
+          <span className="poster-logos" role="img" aria-label={`Läuft bei ${logos.map((l) => l.name).join(", ")}`}>
+            {logos.slice(0, 2).map((l) => <img key={l.src} src={l.src} alt="" loading="lazy" />)}
+          </span>
+        )}
       </span>
       <span className="card-text">
         <span className="card-title">{title}</span>

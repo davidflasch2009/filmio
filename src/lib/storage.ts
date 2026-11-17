@@ -1,4 +1,4 @@
-import type { Answer, Film, FilmInfo, Status, Store } from "../types"
+import type { Answer, Film, FilmInfo, ReleaseInfo, Service, Status, Store } from "../types"
 import { QUESTIONS } from "./scoring"
 import { localDateStamp } from "./format"
 
@@ -31,6 +31,33 @@ const isObject = (x: unknown): x is Record<string, unknown> =>
   typeof x === "object" && x !== null && !Array.isArray(x)
 const isNullableString = (x: unknown): x is string | null => x === null || typeof x === "string"
 const isIsoDate = (x: unknown): x is string => typeof x === "string" && !Number.isNaN(Date.parse(x))
+const isDay = (x: unknown): x is string => typeof x === "string" && /^\d{4}-\d{2}-\d{2}$/.test(x)
+const REGION_CODES = ["DE", "AT", "CH"] as const
+
+/** Erscheinungstermine; ungültig → null (dann holt die App sie neu). */
+function checkRelease(x: unknown): ReleaseInfo | null {
+  if (!isObject(x) || !(x.date === null || isDay(x.date)) || typeof x.pending !== "boolean" || !isIsoDate(x.checkedAt)) return null
+  const local: ReleaseInfo["local"] = {}
+  if (isObject(x.local)) {
+    for (const r of REGION_CODES) {
+      const l = x.local[r]
+      if (isObject(l) && isDay(l.date) && typeof l.cinema === "boolean") local[r] = { date: l.date, cinema: l.cinema }
+    }
+  }
+  return { date: x.date, local, pending: x.pending, checkedAt: x.checkedAt }
+}
+
+function checkServices(x: unknown): Store["services"] {
+  if (!isObject(x) || !Array.isArray(x.list) || !isIsoDate(x.updatedAt)) return undefined
+  const list: Service[] = []
+  for (const s of x.list) {
+    if (isObject(s) && typeof s.id === "number" && typeof s.name === "string" && isNullableString(s.logoPath) &&
+      Array.isArray(s.ids) && s.ids.every((i) => typeof i === "number")) {
+      list.push({ id: s.id, name: s.name, logoPath: s.logoPath, ids: [...s.ids] })
+    }
+  }
+  return { list, updatedAt: x.updatedAt }
+}
 
 type FilmCheck = { ok: true; film: Film } | { ok: false; error: string }
 
@@ -67,6 +94,11 @@ function checkFilm(x: unknown): FilmCheck {
   if (!(f.fromNotes === undefined || typeof f.fromNotes === "boolean")) return fail("fromNotes", "true/false")
   if (!(f.backdropPath === undefined || isNullableString(f.backdropPath))) return fail("backdropPath", "Text oder null")
   if (!(f.updatedAt === undefined || isIsoDate(f.updatedAt))) return fail("updatedAt", "ISO-Datum")
+  if (!(f.priority === undefined || typeof f.priority === "boolean")) return fail("priority", "true/false")
+  if (!(f.rewatches === undefined || (Array.isArray(f.rewatches) && f.rewatches.every(isIsoDate))))
+    return fail("rewatches", "Liste von ISO-Daten")
+  // Kaputte Termine sind kein Grund, den Film abzulehnen – sie werden neu geholt.
+  const release = f.release === undefined ? null : checkRelease(f.release)
 
   return {
     ok: true,
@@ -88,6 +120,9 @@ function checkFilm(x: unknown): FilmCheck {
       // Fehlt das Feld, holt die App das Szenenbild später nach.
       ...(f.backdropPath === undefined ? {} : { backdropPath: f.backdropPath }),
       ...(f.updatedAt === undefined ? {} : { updatedAt: f.updatedAt }),
+      ...(release ? { release } : {}),
+      ...(f.priority ? { priority: true } : {}),
+      ...(Array.isArray(f.rewatches) && f.rewatches.length ? { rewatches: [...(f.rewatches as string[])] } : {}),
     },
   }
 }
@@ -102,9 +137,12 @@ function checkDeleted(x: unknown): Record<string, string> | undefined {
   return Object.keys(out).length ? out : undefined
 }
 
-/** Store mit neuer Filmliste; Lösch-Marker bleiben erhalten. */
+/** Store mit neuer Filmliste; Lösch-Marker und Dienste bleiben erhalten. */
 function withFilms(store: Store, films: Film[], deleted: Record<string, string> | undefined = store.deleted): Store {
-  return deleted && Object.keys(deleted).length ? { version: 1, films, deleted } : { version: 1, films }
+  const next: Store = { version: 1, films }
+  if (deleted && Object.keys(deleted).length) next.deleted = deleted
+  if (store.services) next.services = store.services
+  return next
 }
 
 /** Zeitpunkt der letzten Änderung eines Films (ältere Einträge haben noch kein updatedAt). */
@@ -186,7 +224,8 @@ export function parseStore(data: unknown): Store | null {
     const check = checkFilm(entry)
     if (check.ok) films.push(check.film)
   }
-  return withFilms(emptyStore(), dedupe(films), checkDeleted(data.deleted))
+  const base: Store = { version: 1, films: [], ...(checkServices(data.services) ? { services: checkServices(data.services) } : {}) }
+  return withFilms(base, dedupe(films), checkDeleted(data.deleted))
 }
 
 type ChangeListener = (store: Store) => void
@@ -271,6 +310,14 @@ export function removeFilm(tmdbId: number): Store {
   return next
 }
 
+/** Meine Streaming-Dienste setzen (gilt auf allen Geräten). */
+export function setServices(list: Service[]): Store {
+  const store = load()
+  const next: Store = { ...withFilms(store, store.films), services: { list, updatedAt: nowIso() } }
+  save(next)
+  return next
+}
+
 export function getByStatus(status: Status, store: Store = load()): Film[] {
   return store.films.filter((f) => f.status === status)
 }
@@ -330,7 +377,7 @@ export async function importJson(file: File, mode: ImportMode = "merge"): Promis
     const keep = new Set(incoming.films.map((f) => f.tmdbId))
     const deleted = withoutDeleted(current.deleted, keep) ?? {}
     for (const f of current.films) if (!keep.has(f.tmdbId)) deleted[f.tmdbId] = now
-    const next = withFilms(incoming, incoming.films, deleted)
+    const next = withFilms({ ...incoming, services: current.services }, incoming.films, deleted)
     save(next)
     return { store: next, mode, added: incoming.films.length, updated: 0, total: incoming.films.length }
   }

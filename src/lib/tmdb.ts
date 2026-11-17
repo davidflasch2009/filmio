@@ -1,4 +1,4 @@
-import type { FilmInfo } from "../types"
+import type { FilmInfo, ReleaseInfo, RegionCode, Service } from "../types"
 import type { Region } from "./settings"
 
 const BASE = "https://api.themoviedb.org/3"
@@ -45,6 +45,8 @@ export interface TmdbMovieDetails {
   videos?: { results?: { key: string; site: string; type: string; iso_639_1?: string; official?: boolean }[] }
   "watch/providers"?: { results?: Record<string, TmdbWatchRegion | undefined> }
   recommendations?: { results?: TmdbListItem[] }
+  status?: string
+  release_dates?: { results?: { iso_3166_1: string; release_dates?: { type: number; release_date: string }[] }[] }
 }
 
 interface TmdbProvider { provider_id: number; provider_name: string; logo_path: string | null; display_priority?: number }
@@ -106,14 +108,70 @@ export function smallImageUrl(path: string | null, size: "w92" | "w185" = "w185"
   return path ? `${IMG}/${size}${path}` : null
 }
 
-/** Nur das Szenenbild eines Films (zum Nachladen für ältere Einträge). null = TMDB hat keins. */
-export async function fetchBackdropPath(id: number): Promise<string | null> {
+const RELEASE_REGIONS: RegionCode[] = ["DE", "AT", "CH"]
+
+/**
+ * Erscheinungstermine aus den TMDB-Daten. Je Land zählt der erste Kinostart (Typ 2/3),
+ * sonst die erste digitale Veröffentlichung (Typ 4, z.B. direkt bei einem Streamingdienst).
+ */
+export function parseRelease(d: Pick<TmdbMovieDetails, "release_date" | "status" | "release_dates">, checkedAt = new Date().toISOString()): ReleaseInfo {
+  const day = (iso: string | undefined) => (iso && /^\d{4}-\d{2}-\d{2}/.test(iso) ? iso.slice(0, 10) : null)
+  const local: ReleaseInfo["local"] = {}
+  for (const r of RELEASE_REGIONS) {
+    const dates = d.release_dates?.results?.find((x) => x.iso_3166_1 === r)?.release_dates ?? []
+    const first = (types: number[]) => dates.filter((x) => types.includes(x.type)).map((x) => day(x.release_date)).filter((x) => x !== null).sort()[0]
+    const cinema = first([2, 3])
+    const digital = first([4])
+    if (cinema) local[r] = { date: cinema, cinema: true }
+    else if (digital) local[r] = { date: digital, cinema: false }
+  }
+  return { date: day(d.release_date), local, pending: !!d.status && d.status !== "Released", checkedAt }
+}
+
+/** Nachzuladende Felder für gespeicherte Filme: Szenenbild + Erscheinungstermine. null = Film gibt es bei TMDB nicht (mehr). */
+export async function fetchFilmMeta(id: number): Promise<Pick<FilmInfo, "backdropPath" | "release"> | null> {
   try {
-    return (await getMovie(id)).backdrop_path ?? null
+    const d = await request<TmdbMovieDetails>(`${BASE}/movie/${id}?language=de-DE&append_to_response=release_dates`)
+    return { backdropPath: d.backdrop_path ?? null, release: parseRelease(d) }
   } catch (e) {
     if (e instanceof TmdbError && e.status === 404) return null
     throw e
   }
+}
+
+/** IDs der Anbieter, bei denen der Film im Abo/kostenlos läuft – je Land. */
+export async function fetchStreamIds(id: number): Promise<Record<RegionCode, number[]>> {
+  const data = await request<{ results?: Record<string, TmdbWatchRegion | undefined> }>(`${BASE}/movie/${id}/watch/providers`)
+  const out = {} as Record<RegionCode, number[]>
+  for (const r of RELEASE_REGIONS) {
+    const reg = data.results?.[r]
+    out[r] = [...new Set([...(reg?.flatrate ?? []), ...(reg?.free ?? []), ...(reg?.ads ?? [])].map((p) => p.provider_id))]
+  }
+  return out
+}
+
+/** Name ohne Werbe-Variante: „Netflix Standard with Ads“ → „Netflix“. */
+function baseProviderName(name: string): string {
+  return name.replace(/\s+(standard|basic)?\s*with ads$/i, "").trim()
+}
+
+/** Alle Streaming-Dienste eines Landes (für „Meine Dienste“), beliebteste zuerst; Werbe-Varianten zusammengefasst. */
+export async function loadServiceCatalog(region: RegionCode): Promise<Service[]> {
+  const data = await request<{ results?: (TmdbProvider & { display_priorities?: Record<string, number> })[] }>(
+    `${BASE}/watch/providers/movie?language=de-DE&watch_region=${region}`)
+  const all = (data.results ?? []).slice()
+    .sort((a, b) => (a.display_priorities?.[region] ?? a.display_priority ?? 999) - (b.display_priorities?.[region] ?? b.display_priority ?? 999))
+  const byName = new Map<string, Service>()
+  for (const p of all) {
+    const name = baseProviderName(p.provider_name)
+    const existing = byName.get(name.toLowerCase())
+    if (existing) {
+      existing.ids.push(p.provider_id)
+      continue
+    }
+    byName.set(name.toLowerCase(), { id: p.provider_id, name, logoPath: p.logo_path ?? null, ids: [p.provider_id] })
+  }
+  return [...byName.values()]
 }
 
 /** "2019-05-30" → 2019 */
@@ -213,7 +271,7 @@ export function loadMovieFull(id: number): Promise<MovieFull> {
 
   const promise = (async () => {
     const de = await request<TmdbMovieDetails>(
-      `${BASE}/movie/${id}?language=de-DE&append_to_response=credits,videos,watch/providers,recommendations&include_video_language=de,en`)
+      `${BASE}/movie/${id}?language=de-DE&append_to_response=credits,videos,watch/providers,recommendations,release_dates&include_video_language=de,en`)
     let overview = (de.overview ?? "").trim()
     if (!overview) {
       try {
@@ -231,6 +289,7 @@ export function loadMovieFull(id: number): Promise<MovieFull> {
       genres: (de.genres ?? []).map((g) => g.name),
       overview,
       runtime: de.runtime ? de.runtime : null,
+      release: parseRelease(de),
     }
     const regions = de["watch/providers"]?.results ?? {}
     const extras: MovieExtras = {

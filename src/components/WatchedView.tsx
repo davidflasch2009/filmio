@@ -29,6 +29,10 @@ interface Props {
 const byTitle = (a: Film, b: Film) => a.title.localeCompare(b.title, "de", { sensitivity: "base" })
 const time = (iso: string | null) => (iso ? Date.parse(iso) || 0 : 0)
 
+function lastSeen(f: Film): number {
+  return Math.max(Date.parse(f.watchedAt ?? "") || 0, ...(f.rewatches ?? []).map((r) => Date.parse(r) || 0))
+}
+
 export default function WatchedView({ films, onOpen, onFindFilms }: Props) {
   const [sort, setSort] = useState<SortKey>("rating-desc")
   const [genre, setGenre] = useState("")
@@ -70,7 +74,8 @@ export default function WatchedView({ films, onOpen, onFindFilms }: Props) {
         sorted.sort((a, b) => time(b.addedAt) - time(a.addedAt) || byTitle(a, b))
         break
       case "watched-desc":
-        sorted.sort((a, b) => time(b.watchedAt) - time(a.watchedAt) || byTitle(a, b))
+        // Zuletzt gesehen – auch das letzte Mal, wenn ein Film mehrmals geschaut wurde.
+        sorted.sort((a, b) => lastSeen(b) - lastSeen(a) || byTitle(a, b))
         break
       case "title":
         sorted.sort(byTitle)

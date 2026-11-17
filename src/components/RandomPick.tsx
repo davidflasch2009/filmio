@@ -1,12 +1,15 @@
 import { useEffect, useMemo, useState } from "react"
-import type { Film } from "../types"
+import type { Film, Service } from "../types"
 import { formatRuntime } from "../lib/format"
 import { Poster } from "./FilmCard"
 import FilterChip from "./FilterChip"
-import { IconDice, IconX } from "./Icons"
+import { IconDice, IconTv, IconX } from "./Icons"
 
 interface Props {
   films: Film[]
+  /** tmdbId → meine Dienste, bei denen der Film läuft (leer, wenn keine Dienste gewählt). */
+  streams: Map<number, Service[]>
+  hasServices: boolean
   onOpen: (film: Film) => void
   onClose: () => void
 }
@@ -42,17 +45,20 @@ function makeSpin(films: Film[], seen: Set<number>, lastId: number | null): Spin
 /** Laufzeit-Grenze für den Filter „Unter 2 Std.“ (Minuten). */
 const SHORT_LIMIT = 120
 
-function filterPool(films: Film[], genre: string, short: boolean): Film[] {
+interface Filter { genre: string; short: boolean; mine: boolean }
+
+function filterPool(films: Film[], { genre, short, mine }: Filter, streams: Map<number, Service[]>): Film[] {
   return films.filter((f) =>
     (!genre || f.genres.includes(genre)) &&
-    (!short || (f.runtime !== null && f.runtime < SHORT_LIMIT)))
+    (!short || (f.runtime !== null && f.runtime < SHORT_LIMIT)) &&
+    (!mine || (streams.get(f.tmdbId)?.length ?? 0) > 0))
 }
 
 /** Zufälliger Vorschlag aus der Watchlist – auf Wunsch nur aus einem Genre oder nur kürzere Filme. */
-export default function RandomPick({ films, onOpen, onClose }: Props) {
+export default function RandomPick({ films, streams, hasServices, onOpen, onClose }: Props) {
   const [reduced] = useState(prefersReducedMotion)
-  const [genre, setGenre] = useState("")
-  const [short, setShort] = useState(false)
+  const [filter, setFilter] = useState<Filter>({ genre: "", short: false, mine: false })
+  const { genre, short, mine } = filter
   /** null = kein Film passt zum Filter. */
   const [spin, setSpin] = useState<Spin | null>(() => (films.length ? makeSpin(films, new Set(), null) : null))
   const [frame, setFrame] = useState(() => (reduced && spin ? spin.frames.length : 0))
@@ -72,7 +78,7 @@ export default function RandomPick({ films, onOpen, onClose }: Props) {
     () => [...new Set(films.flatMap((f) => f.genres))].sort((a, b) => a.localeCompare(b, "de")),
     [films],
   )
-  const pool = filterPool(films, genre, short)
+  const pool = filterPool(films, filter, streams)
 
   function start(next: Spin | null) {
     setSpin(next)
@@ -82,10 +88,10 @@ export default function RandomPick({ films, onOpen, onClose }: Props) {
     if (spin) start(makeSpin(pool, spin.seen, spin.target.tmdbId))
   }
   /** Filter ändern = neu würfeln, nur aus den passenden Filmen. */
-  function applyFilter(nextGenre: string, nextShort: boolean) {
-    setGenre(nextGenre)
-    setShort(nextShort)
-    const nextPool = filterPool(films, nextGenre, nextShort)
+  function applyFilter(patch: Partial<Filter>) {
+    const next = { ...filter, ...patch }
+    setFilter(next)
+    const nextPool = filterPool(films, next, streams)
     start(nextPool.length ? makeSpin(nextPool, new Set(), null) : null)
   }
 
@@ -111,7 +117,7 @@ export default function RandomPick({ films, onOpen, onClose }: Props) {
             label="Genre"
             options={[{ value: "", label: "Alle Genres" }, ...genres.map((g) => ({ value: g, label: g }))]}
             value={genre}
-            onChange={(g) => applyFilter(g, short)}
+            onChange={(g) => applyFilter({ genre: g })}
             active={genre !== ""}
             idleLabel="Genre"
           />
@@ -119,10 +125,20 @@ export default function RandomPick({ films, onOpen, onClose }: Props) {
             type="button"
             className={`chip chip-toggle${short ? " chip-active" : ""}`}
             aria-pressed={short}
-            onClick={() => applyFilter(genre, !short)}
+            onClick={() => applyFilter({ short: !short })}
           >
             <span className="chip-text">Unter 2 Std.</span>
           </button>
+          {hasServices && (
+            <button
+              type="button"
+              className={`chip chip-toggle${mine ? " chip-active" : ""}`}
+              aria-pressed={mine}
+              onClick={() => applyFilter({ mine: !mine })}
+            >
+              <IconTv /><span className="chip-text">Läuft bei mir</span>
+            </button>
+          )}
         </div>
 
         {spin && shown ? (
