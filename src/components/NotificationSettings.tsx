@@ -75,13 +75,12 @@ export default function NotificationSettings({ region, hasServices, onOpenServic
 
   return (
     <>
-      <h2 className="group-label">Mitteilungen</h2>
       <div className="group">
         <div className="group-row switch-row">
-          <span className="row-icon"><IconBell /></span>
+          <IconBell className="row-ic" />
           <span className="row-text" id="push-label">
-            Neues auf der Watchlist
-            <span className="row-sub">Läuft ein Film bei deinen Diensten oder kommt ins Kino – einmal am Tag, gegen 17 Uhr</span>
+            Mitteilungen
+            <span className="row-sub">Wenn ein Watchlist-Film bei deinen Diensten läuft oder ins Kino kommt</span>
           </span>
           <button
             type="button"

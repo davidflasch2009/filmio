@@ -1,14 +1,18 @@
-import { useRef, useState, useSyncExternalStore, type FormEvent } from "react"
+import { useMemo, useState, useSyncExternalStore } from "react"
 import type { MyCinema, Service, Store } from "../types"
-import { exportJson, importJson, type ImportMode, type ImportResult } from "../lib/storage"
+import type { ImportResult } from "../lib/storage"
 import { GRID_SIZES, REGIONS, type Settings } from "../lib/settings"
 import { appVersion } from "../lib/updates"
 import { forceSync, getSyncState, subscribeSync, type SyncState } from "../lib/sync"
+import { recapYears } from "../lib/recap"
+import { smallImageUrl } from "../lib/tmdb"
 import tmdbLogo from "../assets/tmdb-logo.svg"
 import ViewHeader from "./ViewHeader"
-import { IconChart, IconCheck, IconInfo, IconList, IconTicket, IconChevronRight, IconDownload, IconLogout, IconSync, IconTv, IconUpload, IconUser } from "./Icons"
-import { smallImageUrl } from "../lib/tmdb"
 import NotificationSettings from "./NotificationSettings"
+import BackupView from "./BackupView"
+import {
+  IconChart, IconCheck, IconChevronRight, IconDownload, IconGrid, IconGlobe, IconInfo, IconList, IconLogout, IconSync, IconTicket, IconTv,
+} from "./Icons"
 
 interface Props {
   store: Store
@@ -25,11 +29,9 @@ interface Props {
   onOpenCinema: () => void
 }
 
-type Message = { kind: "ok" | "error"; text: string }
-
 function syncText(state: SyncState): string {
   if (state.status === "syncing") return "Wird abgeglichen …"
-  if (state.status === "offline") return "Offline – wird abgeglichen, sobald du wieder online bist"
+  if (state.status === "offline") return "Offline – wird später abgeglichen"
   if (state.status === "error") return state.error ?? "Abgleich fehlgeschlagen"
   if (!state.lastSync) return "Noch nicht abgeglichen"
   const min = Math.floor((Date.now() - state.lastSync) / 60_000)
@@ -39,161 +41,94 @@ function syncText(state: SyncState): string {
   return `Abgeglichen · ${time}`
 }
 
+type Picker = null | "grid" | "region"
+
 export default function MoreView({ store, account, onSignOut, onImported, settings, onSettingsChange, onOpenStats, services, onOpenServices, onOpenLists, cinema, onOpenCinema }: Props) {
   const { gridSize, region, questionHelp } = settings
-  const fileRef = useRef<HTMLInputElement>(null)
-  const [file, setFile] = useState<File | null>(null)
-  const [mode, setMode] = useState<ImportMode>("merge")
-  const [busy, setBusy] = useState(false)
-  const [message, setMessage] = useState<Message | null>(null)
   const sync = useSyncExternalStore(subscribeSync, getSyncState)
+  const [picker, setPicker] = useState<Picker>(null)
+  const [backupOpen, setBackupOpen] = useState(false)
 
-  const watched = store.films.filter((f) => f.status === "watched").length
-  const watchlist = store.films.length - watched
+  const stats = useMemo(() => {
+    const watched = store.films.filter((f) => f.status === "watched")
+    const minutes = watched.reduce((s, f) => s + (f.runtime ?? 0) * (1 + (f.rewatches?.length ?? 0)), 0)
+    return { watched: watched.length, watchlist: store.films.length - watched.length, hours: Math.round(minutes / 60) }
+  }, [store.films])
   const tagCount = new Set(store.films.flatMap((f) => f.tags ?? [])).size
-
-  function onExport() {
-    try {
-      exportJson()
-      setMessage({ kind: "ok", text: `Backup mit ${store.films.length} Filmen wird heruntergeladen.` })
-    } catch (e) {
-      setMessage({ kind: "error", text: e instanceof Error ? e.message : "Export fehlgeschlagen." })
-    }
-  }
-
-  async function onImport(e: FormEvent) {
-    e.preventDefault()
-    if (!file) return
-    if (mode === "replace" && store.films.length > 0 &&
-      !window.confirm(`Alle ${store.films.length} vorhandenen Filme werden durch das Backup ersetzt. Fortfahren?`)) {
-      return
-    }
-    setBusy(true)
-    setMessage(null)
-    try {
-      const result = await importJson(file, mode)
-      onImported(result)
-      setMessage({
-        kind: "ok",
-        text: result.mode === "replace"
-          ? `Import fertig: Liste ersetzt, jetzt ${result.total} Filme.`
-          : `Import fertig: ${result.added} neu, ${result.updated} aktualisiert – jetzt ${result.total} Filme.`,
-      })
-    } catch (err) {
-      setMessage({
-        kind: "error",
-        text: `Import abgebrochen, nichts wurde geändert. ${err instanceof Error ? err.message : ""}`.trim(),
-      })
-    } finally {
-      setBusy(false)
-      // Auswahl immer zurücksetzen: Sonst feuert der Browser kein "change", wenn dieselbe
-      // (z.B. korrigierte) Datei erneut gewählt wird, und das veraltete File-Objekt bleibt hängen.
-      setFile(null)
-      if (fileRef.current) fileRef.current.value = ""
-    }
-  }
+  const year = recapYears(store.films)[0]
+  const gridLabel = GRID_SIZES.find((g) => g.id === gridSize)?.label ?? ""
+  const regionLabel = REGIONS.find((r) => r.id === region)?.label ?? region
+  const initial = (account.trim()[0] ?? "?").toUpperCase()
 
   return (
-    <section className="view" aria-labelledby="more-heading">
+    <section className="view more" aria-labelledby="more-heading">
       <ViewHeader id="more-heading" title="Mehr" />
 
-      <div className="group account">
-        <div className="group-row account-row">
-          <span className="row-icon"><IconUser /></span>
-          <span className="row-text">
-            {account || "Dein Account"}
-            <span className={`row-sub sync-${sync.status}`} role="status">{syncText(sync)}</span>
-          </span>
+      {/* Profil */}
+      <div className="profile">
+        <div className="profile-top">
+          <span className="profile-avatar" aria-hidden="true">{initial}</span>
+          <div className="profile-name">
+            <strong>{account || "Dein Account"}</strong>
+            <span className={`profile-sync sync-${sync.status}`} role="status">{syncText(sync)}</span>
+          </div>
         </div>
-        <button type="button" className="group-row row-button" onClick={() => void forceSync()} disabled={sync.status === "syncing"}>
-          <span className="row-icon"><IconSync /></span>
-          <span className="row-text">Jetzt abgleichen</span>
-        </button>
-        <button type="button" className="group-row row-button row-danger" onClick={onSignOut}>
-          <span className="row-icon"><IconLogout /></span>
-          <span className="row-text">Abmelden</span>
+        <button type="button" className="profile-stats" onClick={onOpenStats} aria-label="Statistik öffnen">
+          <span><strong>{stats.watched.toLocaleString("de-DE")}</strong>Gesehen</span>
+          <span><strong>{stats.watchlist.toLocaleString("de-DE")}</strong>Watchlist</span>
+          <span><strong>{stats.hours.toLocaleString("de-DE")}</strong>Stunden</span>
         </button>
       </div>
 
+      <h2 className="group-label">Persönliches</h2>
       <div className="group">
         <button type="button" className="group-row row-button" onClick={onOpenStats}>
-          <span className="row-icon"><IconChart /></span>
-          <span className="row-text">Statistik</span>
+          <IconChart className="row-ic" />
+          <span className="row-text">Statistik{year && <span className="row-sub">mit Jahresrückblick {year}</span>}</span>
           <IconChevronRight className="row-chevron" />
         </button>
         <button type="button" className="group-row row-button" onClick={onOpenLists}>
-          <span className="row-icon"><IconList /></span>
-          <span className="row-text">
-            Meine Listen
-            {tagCount > 0 && <span className="row-sub">{tagCount === 1 ? "1 Liste" : `${tagCount} Listen`}</span>}
-          </span>
+          <IconList className="row-ic" />
+          <span className="row-text">Meine Listen</span>
+          <span className="row-value">{tagCount || ""}</span>
           <IconChevronRight className="row-chevron" />
         </button>
         <button type="button" className="group-row row-button" onClick={onOpenCinema}>
-          <span className="row-icon"><IconTicket /></span>
-          <span className="row-text">
-            Mein Kino
-            <span className="row-sub">{cinema ? cinema.name : "Keins ausgewählt"}</span>
-          </span>
+          <IconTicket className="row-ic" />
+          <span className="row-text">Mein Kino</span>
+          <span className="row-value">{cinema ? cinema.name : "Keins"}</span>
           <IconChevronRight className="row-chevron" />
         </button>
         <button type="button" className="group-row row-button" onClick={onOpenServices}>
-          <span className="row-icon"><IconTv /></span>
-          <span className="row-text">
-            Meine Streaming-Dienste
-            <span className="row-sub">{services.length ? services.map((s) => s.name).join(", ") : "Noch keine ausgewählt"}</span>
-          </span>
-          {services.some((s) => s.logoPath) && (
-            <span className="services-summary" aria-hidden="true">
+          <IconTv className="row-ic" />
+          <span className="row-text">Meine Streaming-Dienste</span>
+          {services.some((s) => s.logoPath) ? (
+            <span className="services-summary" aria-label={services.map((s) => s.name).join(", ")}>
               {services.filter((s) => s.logoPath).slice(0, 3).map((s) => <img key={s.id} src={smallImageUrl(s.logoPath, "w92")!} alt="" />)}
             </span>
-          )}
+          ) : <span className="row-value">{services.length ? services.map((s) => s.name).join(", ") : "Keine"}</span>}
           <IconChevronRight className="row-chevron" />
         </button>
       </div>
 
+      <h2 className="group-label">Einstellungen</h2>
       <NotificationSettings region={region} hasServices={services.length > 0} onOpenServices={onOpenServices} />
-
-      <h2 className="group-label">Darstellung</h2>
       <div className="group">
-        <fieldset className="group-row segmented">
-          <legend>Größe der Filmkarten</legend>
-          <div className="segments">
-            {GRID_SIZES.map((g) => (
-              <label key={g.id} className={gridSize === g.id ? "segment segment-active" : "segment"}>
-                <input
-                  type="radio"
-                  name="grid-size"
-                  value={g.id}
-                  checked={gridSize === g.id}
-                  onChange={() => onSettingsChange({ gridSize: g.id })}
-                />
-                <span className="segment-label">{g.label}</span>
-                <span className="segment-hint">{g.hint}</span>
-              </label>
-            ))}
-          </div>
-        </fieldset>
-        <fieldset className="group-row segmented">
-          <legend>Land für Streaming-Anbieter</legend>
-          <div className="segments">
-            {REGIONS.map((r) => (
-              <label key={r.id} className={region === r.id ? "segment segment-active" : "segment"}>
-                <input type="radio" name="region" value={r.id} checked={region === r.id} onChange={() => onSettingsChange({ region: r.id })} />
-                <span className="segment-label">{r.label}</span>
-              </label>
-            ))}
-          </div>
-        </fieldset>
-      </div>
-
-      <div className="group">
+        <button type="button" className="group-row row-button" onClick={() => setPicker("grid")}>
+          <IconGrid className="row-ic" />
+          <span className="row-text">Kartengröße</span>
+          <span className="row-value">{gridLabel}</span>
+          <IconChevronRight className="row-chevron" />
+        </button>
+        <button type="button" className="group-row row-button" onClick={() => setPicker("region")}>
+          <IconGlobe className="row-ic" />
+          <span className="row-text">Land<span className="row-sub">für Streaming-Anbieter und Kinostarts</span></span>
+          <span className="row-value">{regionLabel}</span>
+          <IconChevronRight className="row-chevron" />
+        </button>
         <div className="group-row switch-row">
-          <span className="row-icon"><IconInfo /></span>
-          <span className="row-text" id="help-label">
-            Erklärungen im Fragebogen
-            <span className="row-sub">Das „i“ unter jeder Frage</span>
-          </span>
+          <IconInfo className="row-ic" />
+          <span className="row-text" id="help-label">Erklärungen im Fragebogen<span className="row-sub">Das „i“ unter jeder Frage</span></span>
           <button
             type="button"
             role="switch"
@@ -207,73 +142,60 @@ export default function MoreView({ store, account, onSignOut, onImported, settin
         </div>
       </div>
 
-      <h2 className="group-label">Daten</h2>
+      <h2 className="group-label">Daten & Konto</h2>
       <div className="group">
-        <button type="button" className="group-row row-button" onClick={onExport}>
-          <span className="row-icon"><IconDownload /></span>
-          <span className="row-text">Backup exportieren</span>
+        <button type="button" className="group-row row-button" onClick={() => setBackupOpen(true)}>
+          <IconDownload className="row-ic" />
+          <span className="row-text">Backup & Import</span>
           <IconChevronRight className="row-chevron" />
         </button>
+        <button type="button" className="group-row row-button" onClick={() => void forceSync()} disabled={sync.status === "syncing"}>
+          <IconSync className="row-ic" />
+          <span className="row-text">Jetzt abgleichen</span>
+        </button>
+        <button type="button" className="group-row row-button row-danger" onClick={onSignOut}>
+          <IconLogout className="row-ic" />
+          <span className="row-text">Abmelden</span>
+        </button>
       </div>
-      <p className="group-note">
-        {watched} gesehen, {watchlist} auf der Watchlist – auf allen Geräten, auf denen du angemeldet bist.
-      </p>
 
-      <form onSubmit={onImport} className="group import-form">
-        <label className="group-row row-button">
-          <span className="row-icon"><IconUpload /></span>
-          <span className="row-text">{file ? file.name : "Backup-Datei auswählen"}</span>
-          <IconChevronRight className="row-chevron" />
-          <input
-            ref={fileRef}
-            className="file-input"
-            type="file"
-            accept=".json,application/json"
-            onChange={(e) => { setFile(e.target.files?.[0] ?? null); setMessage(null) }}
-          />
-        </label>
-        <fieldset className="radio-group">
-          <legend className="vh">Vorhandene Daten</legend>
-          <label className="group-row radio-row">
-            <input type="radio" name="import-mode" value="merge" checked={mode === "merge"} onChange={() => setMode("merge")} />
-            <span className="row-text">
-              Zusammenführen
-              <span className="row-sub">Gleiche Filme werden überschrieben, neue ergänzt</span>
-            </span>
-            <IconCheck className="radio-check" />
-          </label>
-          <label className="group-row radio-row">
-            <input type="radio" name="import-mode" value="replace" checked={mode === "replace"} onChange={() => setMode("replace")} />
-            <span className="row-text">
-              Ersetzen
-              <span className="row-sub">Die komplette Liste wird durch das Backup ersetzt</span>
-            </span>
-            <IconCheck className="radio-check" />
-          </label>
-        </fieldset>
-        <div className="group-row">
-          <button type="submit" className="btn btn-primary btn-block" disabled={!file || busy}>{busy ? "Importiere …" : "Importieren"}</button>
-        </div>
-      </form>
-
-      {message && (
-        <p className={`notice ${message.kind === "ok" ? "notice-ok" : "notice-error"}`} role={message.kind === "error" ? "alert" : "status"}>
-          {message.text}
-        </p>
-      )}
-
-      <h2 className="group-label">Über</h2>
-      <div className="group about">
-        <div className="group-row">
-          <p className="about-app"><span className="logo">filmio</span> – deine persönliche Filmliste.</p>
-          <p className="hint">Deine Liste liegt auf deinen Geräten und in deinem eigenen Supabase-Projekt (Frankfurt).</p>
-          <p className="hint app-version">Version {appVersion()}</p>
-        </div>
-        <div className="group-row attribution">
-          <img src={tmdbLogo} alt="TMDB – The Movie Database" className="tmdb-logo" width={32} height={32} />
+      <div className="about">
+        <p className="about-app"><span className="logo">filmio</span> · Version {appVersion()}</p>
+        <div className="attribution">
+          <img src={tmdbLogo} alt="TMDB – The Movie Database" className="tmdb-logo" width={28} height={28} />
           <p>This product uses the TMDB API but is not endorsed or certified by TMDB.</p>
         </div>
       </div>
+
+      {picker && (
+        <div className="sheet-backdrop" onClick={(e) => { if (e.target === e.currentTarget) setPicker(null) }}>
+          <div className="sheet" role="dialog" aria-label={picker === "grid" ? "Kartengröße" : "Land"}>
+            <div className="sheet-grip" aria-hidden="true" />
+            <p className="sheet-title">{picker === "grid" ? "Kartengröße" : "Land für Streaming-Anbieter und Kinostarts"}</p>
+            <div className="sheet-group">
+              {(picker === "grid" ? GRID_SIZES.map((g) => ({ id: g.id, label: g.label, sub: g.hint })) : REGIONS.map((r) => ({ id: r.id, label: r.label, sub: "" }))).map((o) => {
+                const on = picker === "grid" ? o.id === gridSize : o.id === region
+                return (
+                  <button
+                    key={o.id}
+                    type="button"
+                    className="sheet-row"
+                    role="menuitemradio"
+                    aria-checked={on}
+                    onClick={() => { onSettingsChange(picker === "grid" ? { gridSize: o.id as Settings["gridSize"] } : { region: o.id as Settings["region"] }); setPicker(null) }}
+                  >
+                    <span>{o.label}{o.sub && <span className="row-sub"> · {o.sub}</span>}</span>
+                    {on && <IconCheck />}
+                  </button>
+                )
+              })}
+            </div>
+            <button type="button" className="sheet-cancel" onClick={() => setPicker(null)}>Abbrechen</button>
+          </div>
+        </div>
+      )}
+
+      {backupOpen && <BackupView store={store} onImported={onImported} onClose={() => setBackupOpen(false)} />}
     </section>
   )
 }
