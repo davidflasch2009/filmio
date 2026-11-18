@@ -59,7 +59,7 @@ interface RawMovie {
   cinemaIds?: string[] | null
 }
 
-const PROGRAMME_KEY = "filmio.cpx.programme"
+const PROGRAMME_KEY = "filmio.cpx.programme.v2"
 const PROGRAMME_TTL = 6 * 3600 * 1000
 
 function readProgramme(): { at: number; list: CpxMovie[] } | null {
@@ -79,7 +79,18 @@ export function loadProgramme(): Promise<CpxMovie[]> {
   if (cached && Date.now() - cached.at < PROGRAMME_TTL) return Promise.resolve(cached.list)
   programmePending ??= (async () => {
     try {
-      const raw = await get<RawMovie[]>("/api/v2/movies?location=all")
+      // Ohne Datum liefert Cineplexx nur Filme, die heute noch laufen (abends fast keine mehr) –
+      // deshalb heute, morgen und übermorgen abfragen und zusammenführen.
+      const days = [0, 1, 2].map((d) => new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Vienna", year: "numeric", month: "2-digit", day: "2-digit" })
+        .format(new Date(Date.now() + d * 864e5)))
+      const lists = await Promise.all(days.map((day) => get<RawMovie[]>(`/api/v2/movies?location=all&date=${day}`).catch(() => [] as RawMovie[])))
+      if (lists.every((l) => l.length === 0)) throw new Error("Cineplexx-Programm leer")
+      const merged = new Map<string, RawMovie>()
+      for (const m of lists.flat()) {
+        const prev = merged.get(m.id)
+        merged.set(m.id, prev ? { ...prev, cinemaIds: [...new Set([...(prev.cinemaIds ?? []), ...(m.cinemaIds ?? [])])] } : m)
+      }
+      const raw = [...merged.values()]
       const list: CpxMovie[] = raw.map((m) => ({
         id: m.id,
         title: (m.titleCalculated ?? m.title ?? "").replace(/^\*+/, "").trim(),
