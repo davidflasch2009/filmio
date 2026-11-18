@@ -105,14 +105,14 @@ function norm(t: string): string {
 }
 
 /**
- * Suchtreffer aufräumen: ohne Poster raus; Filme, die kaum jemand kennt (unter 50 Bewertungen), nur,
+ * Suchtreffer aufräumen: Filme ohne Poster und solche, die kaum jemand kennt (unter 50 Bewertungen), nur,
  * wenn der Titel genau passt. Genaue Treffer zuerst, sonst die bekanntesten.
  */
 export function cleanSearchResults(results: TmdbSearchResult[], query: string): TmdbSearchResult[] {
   const q = norm(query)
   const exact = (r: TmdbSearchResult) => norm(r.title ?? "") === q || norm(r.original_title ?? "") === q
   return results
-    .filter((r) => r.poster_path && ((r.vote_count ?? 0) >= 50 || exact(r)))
+    .filter((r) => exact(r) || (r.poster_path && (r.vote_count ?? 0) >= 50))
     .sort((a, b) => Number(exact(b)) - Number(exact(a)) || (b.popularity ?? 0) - (a.popularity ?? 0))
 }
 
