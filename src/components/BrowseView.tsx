@@ -2,12 +2,13 @@ import { useEffect, useMemo, useState } from "react"
 import type { Film } from "../types"
 import type { Region } from "../lib/settings"
 import { GENRE_IDS } from "../lib/genres"
-import { backdropUrl, hasToken, loadList, yearFromDate, type BrowseSource, type TmdbListItem } from "../lib/tmdb"
+import { hasToken, loadList, type BrowseSource, type TmdbListItem } from "../lib/tmdb"
 import { useOnline } from "../hooks/useOnline"
 import type { MyCinema } from "../types"
 import type { CpxMovie } from "../lib/cineplexx"
 import { loadCinemaRow } from "../lib/cinemaRow"
-import PosterRow, { StatusMarker } from "./PosterRow"
+import PosterRow from "./PosterRow"
+import HeroCarousel from "./HeroCarousel"
 
 interface Props {
   films: Film[]
@@ -99,23 +100,16 @@ export default function BrowseView({ films, region, active, cinema, programme, o
 
   const savedById = new Map(films.map((f) => [f.tmdbId, f]))
   const trending = lists.trending
-  const hero = trending?.find((t) => t.backdrop_path)
+  // Titelbilder: Trend-Filme mit Szenenbild, die du noch nicht gesehen hast.
+  const heroes = (trending ?? []).filter((t) => t.backdrop_path && savedById.get(t.id)?.status !== "watched").slice(0, 6)
   const loadedAnything = Object.keys(lists).length > 0
   // Offline und noch nichts geladen: nichts anzeigen (der Offline-Hinweis steht darüber).
   if (!online && !loadedAnything) return null
 
   return (
     <div className="browse">
-      {hero ? (
-        <button type="button" className="browse-hero" onClick={() => onOpenItem(hero)}>
-          <img src={backdropUrl(hero.backdrop_path, "w780")!} alt="" />
-          <span className="browse-hero-text">
-            <span className="browse-hero-kicker">Im Trend</span>
-            <span className="browse-hero-title">{hero.title}</span>
-            {yearFromDate(hero.release_date) !== null && <span className="browse-hero-meta">{yearFromDate(hero.release_date)}</span>}
-          </span>
-          <StatusMarker film={savedById.get(hero.id)} />
-        </button>
+      {heroes.length > 0 ? (
+        <HeroCarousel items={heroes} films={films} onOpen={onOpenItem} />
       ) : trending === undefined && <div className="browse-hero browse-hero-skeleton" />}
 
       {cinema && !(cinemaItems && cinemaItems.length === 0) && (
@@ -124,7 +118,7 @@ export default function BrowseView({ films, region, active, cinema, programme, o
 
       {rows.map((row) => {
         const items = lists[row.key]
-        const shown = row.key === "trending" && hero ? items?.filter((i) => i.id !== hero.id) : items
+        const shown = row.key === "trending" ? items?.filter((i) => !heroes.some((h) => h.id === i.id)) : items
         if (shown && shown.length === 0) return null
         return <PosterRow key={row.key} title={row.title} items={shown} films={films} onOpen={onOpenItem} />
       })}

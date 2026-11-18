@@ -8,6 +8,8 @@ import { useStreams } from "./hooks/useStreams"
 import ServicesPicker from "./components/ServicesPicker"
 import ListsView from "./components/ListsView"
 import CinemaPicker from "./components/CinemaPicker"
+import PersonView from "./components/PersonView"
+import type { TmdbPerson } from "./lib/tmdb"
 import { useCinemaProgramme } from "./hooks/useCinemaProgramme"
 import { useOnline } from "./hooks/useOnline"
 import { loadSettings, saveSettings, type Settings } from "./lib/settings"
@@ -179,6 +181,7 @@ function FilmApp({ account, onSignOut }: { account: string; onSignOut: () => voi
   const cinema = store.cinema?.value ?? null
   const programme = useCinemaProgramme(cinema?.id ?? null, online)
   const [cinemaOpen, setCinemaOpen] = useState(false)
+  const [person, setPerson] = useState<TmdbPerson | null>(null)
 
   useEffect(() => {
     if (!toast) return
@@ -186,7 +189,7 @@ function FilmApp({ account, onSignOut }: { account: string; onSignOut: () => voi
     return () => clearTimeout(t)
   }, [toast])
 
-  const overlayOpen = details.length > 0 || rating !== null || picking || statsOpen || servicesOpen || listsOpen || cinemaOpen
+  const overlayOpen = details.length > 0 || rating !== null || picking || statsOpen || servicesOpen || listsOpen || cinemaOpen || person !== null
   useEffect(() => {
     document.body.classList.toggle("no-scroll", overlayOpen)
   }, [overlayOpen])
@@ -422,10 +425,8 @@ function FilmApp({ account, onSignOut }: { account: string; onSignOut: () => voi
             films={store.films}
             region={settings.region}
             active={tab === "search"}
-            onAddToWatchlist={addToWatchlist}
-            onRate={setRating}
             onOpenItem={openItem}
-            onError={notify}
+            onOpenPerson={setPerson}
             cinema={cinema}
             programme={programme}
           />
@@ -451,6 +452,8 @@ function FilmApp({ account, onSignOut }: { account: string; onSignOut: () => voi
       <TabBar active={tab} onChange={changeTab} />
 
       {statsOpen && <StatsView films={store.films} onClose={() => setStatsOpen(false)} onOpen={openSaved} />}
+
+      {person && <PersonView person={person} films={store.films} onOpen={openItem} onClose={() => setPerson(null)} />}
 
       {cinemaOpen && <CinemaPicker selected={cinema} onChange={changeCinema} onClose={() => setCinemaOpen(false)} />}
 

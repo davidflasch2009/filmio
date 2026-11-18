@@ -973,3 +973,23 @@ div.card-main { cursor: default; }
 .d-new .viewings li + li { border-top: 1px solid var(--line); }
 .d-clamp3 { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .sheet-row .service-check .ic { width: 15px; height: 15px; color: var(--on-accent); }
+
+/* ---------- Suche (überarbeitet) ---------- */
+.hero-carousel { display: grid; gap: 10px; }
+.hero-track { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; gap: 0; border-radius: 18px; }
+.hero-track > .browse-hero { flex: 0 0 100%; scroll-snap-align: center; scroll-snap-stop: always; }
+.main .hero-track > .browse-hero { box-shadow: inset 0 0 0 1px rgba(245, 197, 24, 0.2); }
+.hero-dots { display: flex; justify-content: center; gap: 6px; }
+.hero-dots span { width: 6px; height: 6px; border-radius: 3px; background: var(--surface-3); transition: width .25s ease, background .25s ease; }
+.hero-dots span.on { width: 18px; background: var(--accent); }
+.genre-chips { flex-wrap: nowrap; overflow-x: auto; margin: 0 calc(-1 * var(--gutter-r)) 0 calc(-1 * var(--gutter-l)); padding: 0 var(--gutter-r) 2px var(--gutter-l); }
+.genre-chips .chip { flex: none; }
+.people { margin-bottom: 28px; }
+.people-row { list-style: none; display: flex; gap: 14px; overflow-x: auto; margin: 0 calc(-1 * var(--gutter-r)) 0 calc(-1 * var(--gutter-l)); padding: 0 var(--gutter-r) 4px var(--gutter-l); }
+.person { display: grid; justify-items: center; gap: 4px; width: 84px; padding: 0; border: 0; background: none; color: var(--fg); text-align: center; cursor: pointer; }
+.person-img { width: 76px; height: 76px; border-radius: 50%; object-fit: cover; box-shadow: 0 0 0 1px rgba(245, 197, 24, 0.22), 0 8px 18px rgba(0,0,0,.6); }
+.person-name { font-size: 13px; font-weight: 600; line-height: 1.2; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.person-role { color: var(--muted); font-size: 11.5px; }
+.person-head { display: flex; align-items: center; gap: 16px; margin-bottom: 22px; }
+.person-head-img { width: 88px; height: 88px; border-radius: 50%; object-fit: cover; flex: none; box-shadow: 0 0 0 1px rgba(245, 197, 24, 0.25); }
+.person-head-name { margin: 0; font-size: 28px; }

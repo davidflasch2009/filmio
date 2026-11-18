@@ -27,6 +27,8 @@ export interface TmdbListItem {
   poster_path: string | null
   backdrop_path?: string | null
   genre_ids?: number[]
+  vote_count?: number
+  popularity?: number
   vote_average?: number
 }
 export type TmdbSearchResult = TmdbListItem
@@ -94,6 +96,65 @@ export async function searchMovies(query: string, signal?: AbortSignal) {
   const url = `${BASE}/search/movie?query=${encodeURIComponent(query)}&language=de-DE&include_adult=false`
   const data = await request<{ results?: TmdbSearchResult[] }>(url, signal)
   return data.results ?? []
+}
+
+/** Für den Titelvergleich: klein, ohne Akzente, Satzzeichen und Leerzeichen. */
+function norm(t: string): string {
+  return t.toLocaleLowerCase("de").replace(/ß/g, "ss").replace(/&/g, "und")
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, "")
+}
+
+/**
+ * Suchtreffer aufräumen: ohne Poster raus; Filme, die kaum jemand kennt (unter 50 Bewertungen), nur,
+ * wenn der Titel genau passt. Genaue Treffer zuerst, sonst die bekanntesten.
+ */
+export function cleanSearchResults(results: TmdbSearchResult[], query: string): TmdbSearchResult[] {
+  const q = norm(query)
+  const exact = (r: TmdbSearchResult) => norm(r.title ?? "") === q || norm(r.original_title ?? "") === q
+  return results
+    .filter((r) => r.poster_path && ((r.vote_count ?? 0) >= 50 || exact(r)))
+    .sort((a, b) => Number(exact(b)) - Number(exact(a)) || (b.popularity ?? 0) - (a.popularity ?? 0))
+}
+
+// ---------------------------------------------------------------------------
+// Personen (Schauspiel, Regie)
+// ---------------------------------------------------------------------------
+
+export interface TmdbPerson {
+  id: number
+  name: string
+  profile_path: string | null
+  /** „Acting“, „Directing“ … */
+  known_for_department?: string
+  popularity?: number
+}
+
+/** Personen zum Suchbegriff – nur bekannte (mit Bild und gewisser Bekanntheit). */
+export async function searchPeople(query: string, signal?: AbortSignal): Promise<TmdbPerson[]> {
+  const url = `${BASE}/search/person?query=${encodeURIComponent(query)}&language=de-DE&include_adult=false`
+  const data = await request<{ results?: TmdbPerson[] }>(url, signal)
+  return (data.results ?? [])
+    .filter((p) => p.profile_path && (p.popularity ?? 0) >= 1.5 && (p.known_for_department === "Acting" || p.known_for_department === "Directing"))
+    .slice(0, 8)
+}
+
+const personCache = new Map<number, TmdbListItem[]>()
+
+/** Filme einer Person (als Schauspieler bzw. Regisseur), bekannteste zuerst. */
+export async function loadPersonFilms(person: Pick<TmdbPerson, "id" | "known_for_department">): Promise<TmdbListItem[]> {
+  const hit = personCache.get(person.id)
+  if (hit) return hit
+  const data = await request<{ cast?: TmdbListItem[]; crew?: (TmdbListItem & { job?: string })[] }>(
+    `${BASE}/person/${person.id}/movie_credits?language=de-DE`)
+  const raw = person.known_for_department === "Directing"
+    ? (data.crew ?? []).filter((c) => c.job === "Director")
+    : data.cast ?? []
+  const seen = new Set<number>()
+  const list = raw
+    .filter((m) => m.poster_path && !seen.has(m.id) && !!seen.add(m.id))
+    .sort((a, b) => (b.popularity ?? 0) - (a.popularity ?? 0))
+  personCache.set(person.id, list)
+  return list
 }
 
 export async function getMovie(id: number, language: "de-DE" | "en-US" = "de-DE") {
