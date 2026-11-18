@@ -160,7 +160,7 @@ export default function MoreView({ store, account, onSignOut, onImported, settin
       </div>
 
       <div className="about">
-        <p className="about-app"><span className="logo">filmio</span> · Version {appVersion()}</p>
+        <p className="about-app"><span className="logo">filmio</span> · <span className="app-version">Version {appVersion()}</span></p>
         <div className="attribution">
           <img src={tmdbLogo} alt="TMDB – The Movie Database" className="tmdb-logo" width={28} height={28} />
           <p>This product uses the TMDB API but is not endorsed or certified by TMDB.</p>
