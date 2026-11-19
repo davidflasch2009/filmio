@@ -11,6 +11,7 @@ import {
 } from "../lib/tmdb"
 import { useOnline } from "../hooks/useOnline"
 import { useSwipeBack } from "../hooks/useSwipeBack"
+import { useHeroScroll } from "../hooks/useHeroScroll"
 import StarRating from "./StarRating"
 import PosterRow from "./PosterRow"
 import TagEditor from "./TagEditor"
@@ -124,6 +125,17 @@ export default function FilmDetail({
 }: Props) {
   const online = useOnline()
   useSwipeBack(scrollerRef, onClose)
+
+  const heroRef = useRef<HTMLDivElement>(null)
+  const layerRef = useRef<HTMLDivElement>(null)
+  const blurRef = useRef<HTMLDivElement>(null)
+  const shadeRef = useRef<HTMLDivElement>(null)
+  const contentRef = useRef<HTMLDivElement>(null)
+  const barRef = useRef<HTMLDivElement>(null)
+  useHeroScroll(
+    { scroller: scrollerRef, hero: heroRef, layer: layerRef, blur: blurRef, shade: shadeRef, content: contentRef, bar: barRef },
+    [film.tmdbId],
+  )
 
   // Zusatzinfos von TMDB (Besetzung, Anbieter, Filmreihe …) – für nicht gespeicherte Filme auch die Stammdaten.
   const [full, setFull] = useState<MovieFull | null>(() => peekMovieFull(film.tmdbId))
@@ -299,8 +311,9 @@ export default function FilmDetail({
         </div>
       )}
 
-      <div className="d-hero">
-        <div className="d-hero-img"><Hero film={view} /></div>
+      {/* Oben fest: Zurück und „•••“; dahinter blendet beim Scrollen ein verschwommener Streifen ein */}
+      <div className="d-top">
+        <div className="d-top-bar" ref={barRef} aria-hidden="true" />
         <button type="button" className="glass-btn back-btn" onClick={onClose} aria-label="Zurück"><IconChevronLeft /></button>
         {saved && (
           <button type="button" className="glass-btn d-more-btn" onClick={() => setMenu("main")} aria-label="Weitere Aktionen">
@@ -308,7 +321,17 @@ export default function FilmDetail({
           </button>
         )}
       </div>
-      <div className="d-hero-c">
+
+      <div className="d-hero">
+        <div className="d-hero-img" ref={heroRef}>
+          <div className="d-hero-layer" ref={layerRef}>
+            <Hero film={view} />
+            <div className="d-hero-blur" ref={blurRef}><Hero film={view} /></div>
+          </div>
+          <div className="d-hero-shade" ref={shadeRef} />
+        </div>
+      </div>
+      <div className="d-hero-c" ref={contentRef}>
         <div className="d-hero-poster"><Poster path={view.posterPath} title={view.title} /></div>
         {heroText}
       </div>

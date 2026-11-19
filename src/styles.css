@@ -879,10 +879,27 @@ div.card-main { cursor: default; }
 
 /* Oben */
 .d-hero { position: relative; }
-.d-hero-img { height: min(44vh, 380px); -webkit-mask-image: linear-gradient(to bottom, #000 58%, transparent 100%); mask-image: linear-gradient(to bottom, #000 58%, transparent 100%); }
-.d-hero-img .hero-img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.d-hero-img .hero-empty { height: 100%; }
-.d-more-btn { position: absolute; z-index: 2; top: calc(12px + env(safe-area-inset-top)); right: max(14px, env(safe-area-inset-right)); }
+/* Szenenbild: Rahmen bleibt stehen (Verlauf nach unten), das Bild darin läuft langsamer mit (useHeroScroll) */
+.d-hero-img {
+  position: relative; overflow: hidden; height: min(55vh, 560px); transform-origin: 50% 100%; will-change: transform;
+  -webkit-mask-image: linear-gradient(to bottom, #000 58%, transparent 100%); mask-image: linear-gradient(to bottom, #000 58%, transparent 100%);
+}
+.d-hero-layer { position: absolute; inset: 0; will-change: transform; }
+.d-hero-layer .hero-img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.d-hero-layer .hero-empty { height: 100%; }
+.d-hero-blur { position: absolute; inset: 0; opacity: 0; will-change: opacity; }
+.d-hero-blur .hero-img { filter: blur(14px); transform: scale(1.08); }
+.d-hero-shade { position: absolute; inset: 0; background: #000; opacity: 0; pointer-events: none; }
+
+/* Oben fest: Knöpfe + Streifen (Höhe 0, damit nichts verrutscht) */
+.d-new > .d-top { position: sticky; top: 0; z-index: 5; height: 0; max-width: none; }
+.d-top-bar {
+  position: absolute; left: 0; right: 0; top: 0; height: calc(62px + env(safe-area-inset-top)); opacity: 0; pointer-events: none;
+  background: rgba(10, 10, 12, 0.62); -webkit-backdrop-filter: blur(22px) saturate(1.4); backdrop-filter: blur(22px) saturate(1.4);
+  box-shadow: 0 0.5px 0 rgba(255, 255, 255, 0.08);
+}
+.d-top .back-btn { position: absolute; z-index: 1; }
+.d-more-btn { position: absolute; z-index: 1; top: calc(12px + env(safe-area-inset-top)); right: max(14px, env(safe-area-inset-right)); }
 .d-more-btn .ic { width: 22px; height: 22px; }
 .d-hero-text { display: grid; gap: 8px; justify-items: start; }
 .d-hero > .d-hero-text { position: absolute; left: var(--gutter-l); right: var(--gutter-r); bottom: 4px; }
