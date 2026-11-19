@@ -2,8 +2,6 @@ import { useEffect, type RefObject } from "react"
 
 /** So viel langsamer als der Inhalt läuft das Szenenbild mit (0,5 = halb so schnell). */
 const PARALLAX = 0.5
-/** Über diese Strecke blendet der Streifen oben ein (px). */
-const BAR_FADE = 48
 
 interface Parts {
   /** Der scrollende Bereich (die Detailseite). */
@@ -16,16 +14,11 @@ interface Parts {
   blur: RefObject<HTMLElement | null>
   /** Abdunklung über dem Bild. */
   shade: RefObject<HTMLElement | null>
-  /** Ab hier läuft Inhalt unter die Statusleiste (Poster + Titel). */
-  content: RefObject<HTMLElement | null>
-  /** Verschwommener Streifen oben. */
-  bar: RefObject<HTMLElement | null>
 }
 
 /**
  * Scrollen auf der Detailseite wie bei Apple TV: Szenenbild läuft halb so schnell mit und wird dabei dunkler und
- * leicht unscharf, beim Überziehen am oberen Rand wächst es mit, und sobald Inhalt unter die Statusleiste läuft,
- * blendet oben ein verschwommener Streifen ein. Schreibt direkt ins DOM (kein React-Render pro Scroll-Schritt).
+ * leicht unscharf, und beim Überziehen am oberen Rand wächst es mit. Schreibt direkt ins DOM (kein React-Render pro Scroll-Schritt).
  */
 export function useHeroScroll(parts: Parts, deps: unknown[]): void {
   useEffect(() => {
@@ -46,12 +39,6 @@ export function useHeroScroll(parts: Parts, deps: unknown[]): void {
         if (!reduce && parts.layer.current) parts.layer.current.style.transform = y > 0 ? `translate3d(0, ${Math.min(y, h) * PARALLAX}px, 0)` : ""
         if (!reduce && parts.blur.current) parts.blur.current.style.opacity = String(p)
         if (parts.shade.current) parts.shade.current.style.opacity = String(p * 0.75)
-      }
-      const bar = parts.bar.current
-      const content = parts.content.current
-      if (bar && content) {
-        const start = content.offsetTop - bar.offsetHeight
-        bar.style.opacity = String(Math.min(Math.max((y - start) / BAR_FADE, 0), 1))
       }
     }
     const onScroll = () => { if (!frame) frame = requestAnimationFrame(update) }

@@ -891,13 +891,8 @@ div.card-main { cursor: default; }
 .d-hero-blur .hero-img { filter: blur(14px); transform: scale(1.08); }
 .d-hero-shade { position: absolute; inset: 0; background: #000; opacity: 0; pointer-events: none; }
 
-/* Oben fest: Knöpfe + Streifen (Höhe 0, damit nichts verrutscht) */
+/* Oben fest: Knöpfe (Höhe 0, damit nichts verrutscht) */
 .d-new > .d-top { position: sticky; top: 0; z-index: 5; height: 0; max-width: none; }
-.d-top-bar {
-  position: absolute; left: 0; right: 0; top: 0; height: calc(62px + env(safe-area-inset-top)); opacity: 0; pointer-events: none;
-  background: rgba(10, 10, 12, 0.62); -webkit-backdrop-filter: blur(22px) saturate(1.4); backdrop-filter: blur(22px) saturate(1.4);
-  box-shadow: 0 0.5px 0 rgba(255, 255, 255, 0.08);
-}
 .d-top .back-btn { position: absolute; z-index: 1; }
 .d-more-btn { position: absolute; z-index: 1; top: calc(12px + env(safe-area-inset-top)); right: max(14px, env(safe-area-inset-right)); }
 .d-more-btn .ic { width: 22px; height: 22px; }

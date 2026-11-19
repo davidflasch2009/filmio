@@ -130,10 +130,8 @@ export default function FilmDetail({
   const layerRef = useRef<HTMLDivElement>(null)
   const blurRef = useRef<HTMLDivElement>(null)
   const shadeRef = useRef<HTMLDivElement>(null)
-  const contentRef = useRef<HTMLDivElement>(null)
-  const barRef = useRef<HTMLDivElement>(null)
   useHeroScroll(
-    { scroller: scrollerRef, hero: heroRef, layer: layerRef, blur: blurRef, shade: shadeRef, content: contentRef, bar: barRef },
+    { scroller: scrollerRef, hero: heroRef, layer: layerRef, blur: blurRef, shade: shadeRef },
     [film.tmdbId],
   )
 
@@ -311,9 +309,8 @@ export default function FilmDetail({
         </div>
       )}
 
-      {/* Oben fest: Zurück und „•••“; dahinter blendet beim Scrollen ein verschwommener Streifen ein */}
+      {/* Oben fest: Zurück und „•••“ bleiben beim Scrollen stehen */}
       <div className="d-top">
-        <div className="d-top-bar" ref={barRef} aria-hidden="true" />
         <button type="button" className="glass-btn back-btn" onClick={onClose} aria-label="Zurück"><IconChevronLeft /></button>
         {saved && (
           <button type="button" className="glass-btn d-more-btn" onClick={() => setMenu("main")} aria-label="Weitere Aktionen">
@@ -331,7 +328,7 @@ export default function FilmDetail({
           <div className="d-hero-shade" ref={shadeRef} />
         </div>
       </div>
-      <div className="d-hero-c" ref={contentRef}>
+      <div className="d-hero-c">
         <div className="d-hero-poster"><Poster path={view.posterPath} title={view.title} /></div>
         {heroText}
       </div>
