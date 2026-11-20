@@ -32,7 +32,6 @@ const FIRST = { turns: 2, ms: 2500 }
 const AGAIN = { turns: 1, ms: 1500 }
 
 const prefersReducedMotion = () => window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false
-const randomOf = <T,>(list: T[]): T => list[Math.floor(Math.random() * list.length)]
 
 /** Laufzeit-Grenze für den Filter „Unter 2 Std.“ (Minuten). */
 const SHORT_LIMIT = 120
@@ -46,18 +45,20 @@ function filterPool(pool: Candidate[], { genre, short, mine }: Filter, streams: 
     (!mine || (streams.get(f.tmdbId)?.length ?? 0) > 0))
 }
 
-/** Nächster Vorschlag: noch nicht dagewesene zuerst, nie zweimal hintereinander derselbe. */
-function choose(pool: Candidate[], seen: Set<number>, lastId: number | null): { target: Candidate; seen: Set<number> } {
-  let options = pool.filter((c) => !seen.has(c.film.tmdbId) && c.film.tmdbId !== lastId)
-  let nextSeen = new Set(seen)
-  if (options.length === 0) {
-    nextSeen = new Set()
-    options = pool.filter((c) => c.film.tmdbId !== lastId)
-  }
-  if (options.length === 0) options = pool
-  const target = randomOf(options)
-  nextSeen.add(target.film.tmdbId)
-  return { target, seen: nextSeen }
+/** Filme mit Fähnchen (Priorität) kommen so viel öfter dran. */
+const PRIORITY_WEIGHT = 3
+
+/**
+ * Nächster Vorschlag aus den Filmen, die seit dem Öffnen noch nicht dran waren (so lange der Würfel offen ist,
+ * kommt keiner zweimal). Filme mit Priorität sind dreimal so wahrscheinlich. null = alle waren schon dran.
+ */
+function choose(pool: Candidate[], seen: Set<number>): { target: Candidate; seen: Set<number> } | null {
+  const options = pool.filter((c) => !seen.has(c.film.tmdbId))
+  if (options.length === 0) return null
+  const weight = (c: Candidate) => (c.saved && c.film.priority ? PRIORITY_WEIGHT : 1)
+  let r = Math.random() * options.reduce((sum, c) => sum + weight(c), 0)
+  const target = options.find((c) => (r -= weight(c)) < 0) ?? options[options.length - 1]
+  return { target, seen: new Set(seen).add(target.film.tmdbId) }
 }
 
 interface Spin {
@@ -93,6 +94,8 @@ export default function RandomPick({ films, allFilms, series, seriesStart, strea
   const all = useMemo(() => candidates(films, allFilms, series, seriesStart), [films, allFilms, series, seriesStart])
   const pool = filterPool(all, filter, streams)
   const [spin, setSpin] = useState<Spin | null>(null)
+  /** Alle passenden Filme waren seit dem Öffnen schon dran. */
+  const [done, setDone] = useState(false)
   const [adding, setAdding] = useState(false)
   /** Vorschläge, die gerade auf die Watchlist gesetzt wurden. */
   const [added, setAdded] = useState<Set<number>>(new Set())
@@ -102,8 +105,11 @@ export default function RandomPick({ films, allFilms, series, seriesStart, strea
   function roll(from: Candidate[], prev: Spin | null, seen: Set<number>, speed: typeof FIRST) {
     timers.current.forEach(clearTimeout)
     timers.current = []
+    setDone(false)
     if (from.length === 0) { setSpin(null); return }
-    const { target, seen: nextSeen } = choose(from, seen, prev?.target.film.tmdbId ?? null)
+    const chosen = choose(from, seen)
+    if (!chosen) { setDone(true); return }
+    const { target, seen: nextSeen } = chosen
     // Was gerade vorne und daneben zu sehen ist, bleibt stehen; der Vorschlag landet auf einem Platz hinten.
     const keep = new Map<number, Film>()
     if (prev) {
@@ -142,7 +148,7 @@ export default function RandomPick({ films, allFilms, series, seriesStart, strea
   function applyFilter(patch: Partial<Filter>) {
     const next = { ...filter, ...patch }
     setFilter(next)
-    roll(filterPool(all, next, streams), spin, new Set(), AGAIN)
+    roll(filterPool(all, next, streams), spin, spin?.seen ?? new Set(), AGAIN)
   }
 
   async function addTarget(c: Candidate) {
@@ -195,7 +201,16 @@ export default function RandomPick({ films, allFilms, series, seriesStart, strea
           )}
         </div>
 
-        {spin && target ? (
+        {done ? (
+          <div className="pick-done" role="status">
+            <IconDice />
+            <h2 className="pick-title">Alle Filme waren dran</h2>
+            <p className="pick-meta">Jeder passende Film wurde dir seit dem Öffnen schon einmal vorgeschlagen.</p>
+            <button type="button" className="btn btn-primary btn-block" onClick={() => roll(pool, spin, new Set(), FIRST)}>
+              Von vorn
+            </button>
+          </div>
+        ) : spin && target ? (
           <>
             <div className={`pick-stage${landed ? " landed" : ""}`} aria-hidden="true">
               <div className="pick-ring" style={{ transform: `translateZ(calc(var(--r) * -1)) rotateY(${spin.rotation}deg)`, transitionDuration: `${spin.ms}ms` }}>
