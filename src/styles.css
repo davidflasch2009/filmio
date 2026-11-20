@@ -987,7 +987,10 @@ div.card-main { cursor: default; }
 .d-more .detail-dates { margin: 12px 0 0; }
 
 /* „•••“-Menü als Blatt von unten */
-.sheet-backdrop { position: fixed; inset: 0; z-index: 30; background: rgba(0,0,0,.5); display: flex; align-items: flex-end; justify-content: center; animation: fade-in .18s ease both; }
+.sheet-backdrop { position: fixed; inset: 0; z-index: 30; background: rgba(0,0,0,.5); display: flex; align-items: flex-end; justify-content: center; animation: fade-in .18s ease both;
+  /* Wischen auf dem abgedunkelten Bereich scrollt nicht die Seite dahinter */ touch-action: none; overscroll-behavior: contain; }
+/* Detailseite steht still, solange ein Menü offen ist (sonst federt sie auf dem iPhone unter dem Menü mit) */
+.overlay.d-locked { overflow: hidden; }
 @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
 .sheet {
   width: 100%; max-width: 560px; padding: 8px var(--gutter-r) calc(14px + env(safe-area-inset-bottom)) var(--gutter-l);

@@ -301,7 +301,7 @@ export default function FilmDetail({
 
   return (
     <div
-      className={`overlay detail d-new${instant ? "" : " detail-enter"}`}
+      className={`overlay detail d-new${instant ? "" : " detail-enter"}${menu ? " d-locked" : ""}`}
       role="dialog"
       aria-modal="true"
       aria-label={view.title}
