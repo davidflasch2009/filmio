@@ -2,7 +2,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import type { Film, MyCinema, Service, Store } from "./types"
 import { addFilm, cleanTags, load, newFilm, removeFilm, setCinema, setServices, STORAGE_KEY, updateFilm, updateMany, type ImportResult } from "./lib/storage"
 import { formatRating } from "./lib/format"
-import { fetchFilmMeta, hasToken, listItemToInfo, type TmdbListItem } from "./lib/tmdb"
+import { fetchFilmMeta, hasToken, listItemToInfo, loadFilmInfo, type TmdbListItem } from "./lib/tmdb"
 import { releaseNeedsRefresh, upcomingRelease } from "./lib/release"
 import { useStreams } from "./hooks/useStreams"
 import { useSeries } from "./hooks/useSeries"
@@ -239,6 +239,12 @@ function FilmApp({ account, onSignOut }: { account: string; onSignOut: () => voi
     if (persist(() => addFilm(entry))) notify(`„${film.title}“ zur Watchlist hinzugefügt.`)
   }
 
+  /** Fälligen Teil einer Filmreihe auf die Watchlist – mit vollständigen Daten, falls TMDB erreichbar ist. */
+  async function addPartToWatchlist(film: Film) {
+    const info = await loadFilmInfo(film.tmdbId).catch(() => null)
+    addToWatchlist(info ? newFilm(info) : film)
+  }
+
   function saveRating(film: Film, result: RatingResult) {
     const existing = findSaved(film.tmdbId)
     const now = nowIso()
@@ -414,7 +420,9 @@ function FilmApp({ account, onSignOut }: { account: string; onSignOut: () => voi
             streams={streams}
             cinema={cinema}
             programme={programme}
+            series={series}
             onOpen={openSaved}
+            onAddPart={(film) => void addPartToWatchlist(film)}
             onFindFilms={() => changeTab("search")}
             onRandom={() => setPicking(true)}
             onOpenServices={() => setServicesOpen(true)}

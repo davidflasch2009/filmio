@@ -707,6 +707,18 @@ div.card-main { cursor: default; }
 [data-grid="s"] .poster-logos img { width: 18px; height: 18px; border-radius: 4px; }
 [data-grid="l"] .poster-logos img { width: 30px; height: 30px; border-radius: 8px; }
 .watchlist-upcoming { margin-top: 30px; }
+/* Später in der Reihe: wartende Filme abgedunkelt, fehlender Teil durchscheinend mit „+“ */
+.card-waiting .poster { opacity: .42; filter: saturate(.7); }
+.card-waiting .card-title { color: var(--muted); }
+.card-waiting .card-badge { color: rgba(255, 255, 255, .62); }
+.card-suggest .poster { opacity: .32; filter: saturate(.6); }
+.card-suggest .poster { outline: 1.5px dashed rgba(229, 184, 0, .7); outline-offset: -1.5px; }
+.poster-add {
+  position: absolute; left: 50%; top: 50%; display: grid; place-items: center; width: 40px; height: 40px; margin: -20px 0 0 -20px;
+  border-radius: 50%; background: var(--accent); color: var(--on-accent); box-shadow: 0 6px 18px rgba(0, 0, 0, .5);
+}
+.poster-add .ic { width: 22px; height: 22px; }
+.card-suggest .card-title { color: var(--muted); }
 .section-title { margin: 0 0 12px; font: 700 20px/1.2 var(--font-display); letter-spacing: -0.01em; }
 .empty-small { padding: 28px 0; }
 

@@ -85,32 +85,64 @@ function partToFilm(p: SeriesPart): Film {
   return { ...newFilm(listItemToInfo(item)), genres: p.genreIds.map((g) => GENRE_NAMES[g]).filter(Boolean) }
 }
 
+/** Ein Watchlist-Film, der warten muss, weil ein früherer Teil seiner Reihe noch nicht gesehen ist. */
+export interface Waiting {
+  /** Der fällige (früheste erschienene, noch nicht gesehene) Teil. */
+  next: SeriesPart
+  /** Nummer des fälligen Teils und Anzahl erschienener Teile. */
+  part: number
+  total: number
+  name: string
+}
+
+const todayStamp = () => new Date().toISOString().slice(0, 10)
+
+/** Reihe eines Films mit ihren erschienenen Teilen – null, wenn keine (oder noch unbekannt). */
+function releasedParts(film: Film, cache: SeriesCache, today: string): { info: SeriesInfo; released: SeriesPart[] } | null {
+  const colId = cache.films[film.tmdbId]
+  const info = colId == null ? undefined : cache.collections[colId]
+  if (!info) return null
+  const released = info.parts.filter((p) => p.date && p.date <= today)
+  return released.some((p) => p.id === film.tmdbId) ? { info, released } : null
+}
+
+/** Muss dieser Film noch warten? Dann: welcher Teil ist zuerst dran. */
+export function waitingFor(film: Film, byId: Map<number, Film>, cache: SeriesCache, today = todayStamp()): Waiting | null {
+  const s = releasedParts(film, cache, today)
+  if (!s) return null
+  const idx = s.released.findIndex((p) => byId.get(p.id)?.status !== "watched")
+  if (idx < 0 || s.released[idx].id === film.tmdbId) return null
+  return { next: s.released[idx], part: idx + 1, total: s.released.length, name: s.info.name }
+}
+
+/** Fälliger Teil als (nicht gespeicherter) Film – für Vorschlagskarte und Würfel. */
+export function partAsFilm(p: SeriesPart): Film {
+  return partToFilm(p)
+}
+
 /**
  * Was der Würfel aus der Watchlist vorschlagen darf: Bei Filmreihen immer nur den frühesten erschienenen Teil,
  * der noch nicht gesehen ist – auch wenn der nicht auf der Watchlist steht (dann als nicht gespeicherter Vorschlag).
  * Steht der fällige Teil auf der Watchlist, kommt er über seinen eigenen Eintrag (wenn er zum Filter passt).
  */
-export function candidates(watchlist: Film[], all: Film[], cache: SeriesCache, today = new Date().toISOString().slice(0, 10)): Candidate[] {
+export function candidates(watchlist: Film[], all: Film[], cache: SeriesCache, today = todayStamp()): Candidate[] {
   const byId = new Map(all.map((f) => [f.tmdbId, f]))
   const out = new Map<number, Candidate>()
   for (const film of watchlist) {
-    const colId = cache.films[film.tmdbId]
-    const info = colId == null ? undefined : cache.collections[colId]
-    const released = info?.parts.filter((p) => p.date && p.date <= today) ?? []
-    const inSeries = released.some((p) => p.id === film.tmdbId)
-    if (!info || !inSeries) {
+    const s = releasedParts(film, cache, today)
+    if (!s) {
       out.set(film.tmdbId, { film, saved: true })
       continue
     }
-    const series = (id: number) => ({ name: info.name, part: released.findIndex((p) => p.id === id) + 1, total: released.length })
-    const next = released.find((p) => byId.get(p.id)?.status !== "watched")
-    if (!next || next.id === film.tmdbId) {
+    const series = (id: number) => ({ name: s.info.name, part: s.released.findIndex((p) => p.id === id) + 1, total: s.released.length })
+    const wait = waitingFor(film, byId, cache, today)
+    if (!wait) {
       out.set(film.tmdbId, { film, saved: true, series: series(film.tmdbId) })
       continue
     }
     // Ein früherer Teil ist dran. Steht er auf der Watchlist, kommt er über seinen eigenen Eintrag.
-    if (byId.has(next.id)) continue
-    if (!out.has(next.id)) out.set(next.id, { film: partToFilm(next), saved: false, series: series(next.id) })
+    if (byId.has(wait.next.id)) continue
+    if (!out.has(wait.next.id)) out.set(wait.next.id, { film: partToFilm(wait.next), saved: false, series: series(wait.next.id) })
   }
   return [...out.values()]
 }

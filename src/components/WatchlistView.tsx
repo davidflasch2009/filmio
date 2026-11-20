@@ -3,6 +3,7 @@ import type { Film, MyCinema, RegionCode, Service } from "../types"
 import { matchMovie, type CpxMovie } from "../lib/cineplexx"
 import { formatUpcomingShort, todayStamp, upcomingRelease, type Upcoming } from "../lib/release"
 import { smallImageUrl } from "../lib/tmdb"
+import { partAsFilm, waitingFor, type SeriesCache, type Waiting } from "../lib/series"
 import FilmCard from "./FilmCard"
 import FilterChip from "./FilterChip"
 import ViewHeader from "./ViewHeader"
@@ -17,7 +18,11 @@ interface Props {
   /** Mein Kino + dessen Programm – für den Hinweis „Im Kino“. */
   cinema: MyCinema | null
   programme: CpxMovie[] | null
+  /** Filmreihen – Filme, deren früherer Teil noch nicht gesehen ist, warten in „Später in der Reihe“. */
+  series: SeriesCache
   onOpen: (film: Film) => void
+  /** Fälligen Teil einer Reihe auf die Watchlist setzen. */
+  onAddPart: (film: Film) => void
   onFindFilms: () => void
   onRandom: () => void
   onOpenServices: () => void
@@ -30,26 +35,40 @@ function serviceLogos(list: Service[] | undefined) {
   return (list ?? []).filter((s) => s.logoPath).map((s) => ({ src: smallImageUrl(s.logoPath, "w92")!, name: s.name }))
 }
 
-export default function WatchlistView({ films, region, services, streams, cinema, programme, onOpen, onFindFilms, onRandom, onOpenServices }: Props) {
+export default function WatchlistView({ films, region, services, streams, cinema, programme, series, onOpen, onAddPart, onFindFilms, onRandom, onOpenServices }: Props) {
   const [streamOnly, setStreamOnly] = useState(false)
   const [tag, setTag] = useState("")
 
-  const { available, upcoming, total } = useMemo(() => {
+  const { available, upcoming, later, total } = useMemo(() => {
     const today = todayStamp()
+    const byId = new Map(films.map((f) => [f.tmdbId, f]))
     const all = films.filter((f) => f.status === "watchlist" && (!tag || (f.tags ?? []).includes(tag)))
     const available: Film[] = []
     const upcoming: { film: Film; when: Upcoming }[] = []
+    const waiting: { film: Film; wait: Waiting }[] = []
     for (const f of all) {
       const when = upcomingRelease(f, region, today)
+      const wait = when ? null : waitingFor(f, byId, series)
       if (when) upcoming.push({ film: f, when })
+      else if (wait) waiting.push({ film: f, wait })
       else available.push(f)
+    }
+    // „Später in der Reihe“: nach Reihe gruppiert, je Reihe erst der fehlende Teil (Vorschlag), dann die wartenden.
+    const groups = new Map<string, { film: Film; wait: Waiting }[]>()
+    for (const w of waiting) groups.set(w.wait.name, [...(groups.get(w.wait.name) ?? []), w])
+    const later: { film: Film; wait: Waiting | null }[] = []
+    for (const name of [...groups.keys()].sort((a, b) => a.localeCompare(b, "de"))) {
+      const list = groups.get(name)!.sort((a, b) => (a.film.year ?? 0) - (b.film.year ?? 0))
+      const next = list[0].wait.next
+      if (!byId.has(next.id)) later.push({ film: partAsFilm(next), wait: null })
+      later.push(...list)
     }
     // Priorität zuerst, sonst neueste zuerst.
     available.sort((a, b) => Number(!!b.priority) - Number(!!a.priority) || (Date.parse(b.addedAt) || 0) - (Date.parse(a.addedAt) || 0))
     // Nächster Termin zuerst, offene Termine ans Ende.
     upcoming.sort((a, b) => (a.when.date ?? "9999").localeCompare(b.when.date ?? "9999") || a.film.title.localeCompare(b.film.title, "de"))
-    return { available, upcoming, total: all.length }
-  }, [films, region, tag])
+    return { available, upcoming, later, total: all.length }
+  }, [films, region, tag, series])
   const tags = useMemo(
     () => [...new Set(films.filter((f) => f.status === "watchlist").flatMap((f) => f.tags ?? []))].sort((a, b) => a.localeCompare(b, "de")),
     [films],
@@ -136,6 +155,37 @@ export default function WatchlistView({ films, region, services, streams, cinema
                 />
               ))}
             </div>
+          )}
+
+          {!filterOn && later.length > 0 && (
+            <section className="watchlist-upcoming" aria-labelledby="later-heading">
+              <h2 id="later-heading" className="section-title">Später in der Reihe</h2>
+              <div className="grid">
+                {later.map(({ film: f, wait }) => wait ? (
+                  <FilmCard
+                    key={f.tmdbId}
+                    title={f.title}
+                    year={f.year}
+                    posterPath={f.posterPath}
+                    marker={f.priority ? PRIORITY_MARKER : WATCHLIST_MARKER}
+                    badge={`Erst Teil ${wait.part}`}
+                    look="waiting"
+                    onOpen={() => onOpen(f)}
+                  />
+                ) : (
+                  <FilmCard
+                    key={f.tmdbId}
+                    title={f.title}
+                    year={f.year}
+                    posterPath={f.posterPath}
+                    badge="Fehlt noch · hinzufügen"
+                    look="suggest"
+                    actionLabel={`„${f.title}“ auf die Watchlist`}
+                    onOpen={() => onAddPart(f)}
+                  />
+                ))}
+              </div>
+            </section>
           )}
 
           {!filterOn && upcoming.length > 0 && (
