@@ -5,6 +5,7 @@ import { formatRating } from "./lib/format"
 import { fetchFilmMeta, hasToken, listItemToInfo, type TmdbListItem } from "./lib/tmdb"
 import { releaseNeedsRefresh, upcomingRelease } from "./lib/release"
 import { useStreams } from "./hooks/useStreams"
+import { useSeries } from "./hooks/useSeries"
 import ServicesPicker from "./components/ServicesPicker"
 import ListsView from "./components/ListsView"
 import CinemaPicker from "./components/CinemaPicker"
@@ -175,6 +176,8 @@ function FilmApp({ account, onSignOut }: { account: string; onSignOut: () => voi
   // Meine Streaming-Dienste und wo die Watchlist-Filme gerade laufen.
   const services = useMemo<Service[]>(() => store.services?.list ?? [], [store.services])
   const streams = useStreams(store.films, services, region, online)
+  // Filmreihen der Watchlist (für den Würfel: immer der nächste fällige Teil).
+  const series = useSeries(store.films, online)
   const [servicesOpen, setServicesOpen] = useState(false)
   const [listsOpen, setListsOpen] = useState(false)
   // Mein Kino und dessen Programm.
@@ -507,10 +510,13 @@ function FilmApp({ account, onSignOut }: { account: string; onSignOut: () => voi
       {picking && (
         <RandomPick
           films={store.films.filter((f) => f.status === "watchlist" && !upcomingRelease(f, region))}
+          allFilms={store.films}
+          series={series}
           streams={streams}
           hasServices={services.length > 0}
           onClose={() => setPicking(false)}
-          onOpen={(film) => { setPicking(false); openSaved(film) }}
+          onOpen={(film, saved) => { setPicking(false); setDetails([{ tmdbId: film.tmdbId, draft: saved ? null : film }]) }}
+          onAddToWatchlist={addToWatchlist}
         />
       )}
 
