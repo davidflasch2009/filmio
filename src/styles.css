@@ -437,6 +437,9 @@ div.card-main { cursor: default; }
 .pick-title { margin: 0; font: 700 24px/1.2 var(--font-display); letter-spacing: -0.015em; text-wrap: balance; }
 .pick-meta { margin-top: 6px; color: rgba(255, 255, 255, .7); font-size: 14px; }
 .pick-hint { margin: 10px auto 0; max-width: 300px; color: rgba(255, 255, 255, .7); font-size: 13px; }
+.pick-done { display: grid; justify-items: center; gap: 10px; padding: 60px 8px 0; }
+.pick-done > .ic { width: 44px; height: 44px; color: var(--accent); margin-bottom: 6px; }
+.pick-done .btn { margin-top: 18px; }
 .pick-actions { display: grid; align-content: start; gap: 10px; margin-top: 18px; min-height: calc(3 * 48px + 2 * 10px); }
 .pick-actions .btn:not(.btn-primary) { background: rgba(255, 255, 255, .12); -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); }
 

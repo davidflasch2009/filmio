@@ -33,6 +33,43 @@ function pickSeed(films: Film[]): Film | null {
   return liked.length ? liked[Math.floor(Math.random() * liked.length)] : null
 }
 
+/** Basis für „Für dich“: bis zu 5 deiner besten Filme (4,5+ Sterne; gibt es davon weniger als 3, ab 4 Sternen). */
+function pickFavourites(films: Film[]): Film[] {
+  const watched = films.filter((f) => f.status === "watched")
+  let best = watched.filter((f) => (f.rating ?? 0) >= 4.5)
+  if (best.length < 3) best = watched.filter((f) => (f.rating ?? 0) >= 4)
+  return [...best].sort(() => Math.random() - 0.5).slice(0, 5)
+}
+
+/** So viele Filme muss „Für dich“ mindestens haben, sonst wird die Reihe ausgeblendet. */
+const FOR_YOU_MIN = 6
+/** Nur gut bewertete Filme (TMDB-Schnitt und Anzahl Stimmen) – TMDBs Empfehlungen enthalten viel Mittelmaß. */
+const FOR_YOU_MIN_VOTE = 6.8
+const FOR_YOU_MIN_VOTES = 1000
+
+/**
+ * „Für dich“: TMDB-Empfehlungen zu mehreren Lieblingsfilmen zusammengezählt – Filme, die von mehreren deiner
+ * Lieblinge empfohlen werden, zuerst, danach die besser bewerteten. Ohne Gesehenes, Watchlist, noch nicht
+ * Erschienenes und Mittelmaß.
+ */
+async function loadForYou(seeds: Film[], films: Film[]): Promise<TmdbListItem[]> {
+  const known = new Set(films.map((f) => f.tmdbId))
+  const today = new Date().toISOString().slice(0, 10)
+  const lists = await Promise.all(seeds.map((f) => loadList({ kind: "recommendations", movieId: f.tmdbId }).catch(() => [])))
+  const score = new Map<number, { item: TmdbListItem; hits: number; rank: number }>()
+  for (const list of lists) {
+    list.forEach((item) => {
+      if (known.has(item.id) || !item.release_date || item.release_date > today) return
+      if ((item.vote_average ?? 0) < FOR_YOU_MIN_VOTE || (item.vote_count ?? 0) < FOR_YOU_MIN_VOTES) return
+      const e = score.get(item.id) ?? { item, hits: 0, rank: 0 }
+      e.hits += 1
+      e.rank = Math.max(e.rank, item.vote_average ?? 0)
+      score.set(item.id, e)
+    })
+  }
+  return [...score.values()].sort((a, b) => b.hits - a.hits || b.rank - a.rank).map((e) => e.item).slice(0, 20)
+}
+
 /** Deine häufigsten Genres (unter den gut bewerteten Filmen), sonst zwei Standard-Genres. */
 function favouriteGenres(films: Film[]): string[] {
   const counts = new Map<string, number>()
@@ -52,6 +89,7 @@ export default function BrowseView({ films, region, active, cinema, programme, o
   if (active && !started) setStarted(true)
 
   const [seed] = useState(() => pickSeed(films))
+  const [favourites] = useState(() => pickFavourites(films))
   const [genres] = useState(() => favouriteGenres(films))
 
   const rows = useMemo<RowDef[]>(() => [
@@ -94,6 +132,17 @@ export default function BrowseView({ films, region, active, cinema, programme, o
     // cinemaKey fasst Kino und Programm zusammen
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [started, online, cinemaKey])
+  // „Für dich“ (einmal pro Sitzung; Gesehenes/Watchlist wird beim Anzeigen nochmal herausgefiltert).
+  const [forYou, setForYou] = useState<TmdbListItem[] | null>(null)
+  useEffect(() => {
+    if (!started || !online || !hasToken || favourites.length === 0 || forYou) return
+    let cancelled = false
+    loadForYou(favourites, films).then((items) => { if (!cancelled) setForYou(items) }, () => {})
+    return () => { cancelled = true }
+    // films nur beim ersten Laden; danach filtert die Anzeige
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [started, online, favourites, forYou])
+
   const cinemaItems = cinema && cinemaRow?.key === cinemaKey ? cinemaRow.items : cinema && programme ? undefined : []
 
   if (!hasToken) return null
@@ -111,6 +160,13 @@ export default function BrowseView({ films, region, active, cinema, programme, o
       {heroes.length > 0 ? (
         <HeroCarousel items={heroes} films={films} onOpen={onOpenItem} />
       ) : trending === undefined && <div className="browse-hero browse-hero-skeleton" />}
+
+      {(() => {
+        if (favourites.length === 0) return null
+        const items = forYou?.filter((i) => !savedById.has(i.id))
+        if (items && items.length < FOR_YOU_MIN) return null
+        return <PosterRow key="for-you" title="Für dich" items={items} films={films} onOpen={onOpenItem} />
+      })()}
 
       {cinema && !(cinemaItems && cinemaItems.length === 0) && (
         <PosterRow key="my-cinema" title={`Jetzt im ${cinema.name}`} items={cinemaItems} films={films} onOpen={onOpenItem} />
