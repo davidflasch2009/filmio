@@ -205,6 +205,17 @@ export async function fetchFilmMeta(id: number): Promise<Pick<FilmInfo, "backdro
   }
 }
 
+/** Filmreihe, zu der ein Film gehört (null = keine). */
+export async function fetchCollectionId(id: number): Promise<number | null> {
+  try {
+    const d = await request<TmdbMovieDetails>(`${BASE}/movie/${id}?language=de-DE`)
+    return d.belongs_to_collection?.id ?? null
+  } catch (e) {
+    if (e instanceof TmdbError && e.status === 404) return null
+    throw e
+  }
+}
+
 /** IDs der Anbieter, bei denen der Film im Abo/kostenlos läuft – je Land. */
 export async function fetchStreamIds(id: number): Promise<Record<RegionCode, number[]>> {
   const data = await request<{ results?: Record<string, TmdbWatchRegion | undefined> }>(`${BASE}/movie/${id}/watch/providers`)
