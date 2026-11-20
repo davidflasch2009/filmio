@@ -67,6 +67,11 @@ function checkServices(x: unknown): Store["services"] {
   return { list, updatedAt: x.updatedAt }
 }
 
+function checkLooseSeries(x: unknown): Store["looseSeries"] {
+  if (!isObject(x) || !Array.isArray(x.ids) || !isIsoDate(x.updatedAt)) return undefined
+  return { ids: x.ids.filter((i): i is number => typeof i === "number"), updatedAt: x.updatedAt }
+}
+
 type FilmCheck = { ok: true; film: Film } | { ok: false; error: string }
 
 /** Prüft einen Eintrag auf plausible Film-Shape und gibt eine bereinigte Kopie zurück. */
@@ -167,6 +172,7 @@ function withFilms(store: Store, films: Film[], deleted: Record<string, string> 
   if (deleted && Object.keys(deleted).length) next.deleted = deleted
   if (store.services) next.services = store.services
   if (store.cinema) next.cinema = store.cinema
+  if (store.looseSeries) next.looseSeries = store.looseSeries
   return next
 }
 
@@ -251,7 +257,8 @@ export function parseStore(data: unknown): Store | null {
   }
   const services = checkServices(data.services)
   const cinema = checkCinema(data.cinema)
-  const base: Store = { version: 1, films: [], ...(services ? { services } : {}), ...(cinema ? { cinema } : {}) }
+  const looseSeries = checkLooseSeries(data.looseSeries)
+  const base: Store = { version: 1, films: [], ...(services ? { services } : {}), ...(cinema ? { cinema } : {}), ...(looseSeries ? { looseSeries } : {}) }
   return withFilms(base, dedupe(films), checkDeleted(data.deleted))
 }
 
@@ -365,6 +372,17 @@ export function setServices(list: Service[]): Store {
   return next
 }
 
+/** Bei einer Filmreihe die Reihenfolge beachten oder nicht (gilt auf allen Geräten). */
+export function setSeriesLoose(collectionId: number, loose: boolean): Store {
+  const store = load()
+  const ids = new Set(store.looseSeries?.ids ?? [])
+  if (loose) ids.add(collectionId)
+  else ids.delete(collectionId)
+  const next: Store = { ...withFilms(store, store.films), looseSeries: { ids: [...ids], updatedAt: nowIso() } }
+  save(next)
+  return next
+}
+
 export function getByStatus(status: Status, store: Store = load()): Film[] {
   return store.films.filter((f) => f.status === status)
 }
@@ -424,7 +442,7 @@ export async function importJson(file: File, mode: ImportMode = "merge"): Promis
     const keep = new Set(incoming.films.map((f) => f.tmdbId))
     const deleted = withoutDeleted(current.deleted, keep) ?? {}
     for (const f of current.films) if (!keep.has(f.tmdbId)) deleted[f.tmdbId] = now
-    const next = withFilms({ ...incoming, services: current.services, cinema: current.cinema }, incoming.films, deleted)
+    const next = withFilms({ ...incoming, services: current.services, cinema: current.cinema, looseSeries: current.looseSeries }, incoming.films, deleted)
     save(next)
     return { store: next, mode, added: incoming.films.length, updated: 0, total: incoming.films.length }
   }

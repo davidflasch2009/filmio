@@ -54,6 +54,9 @@ interface Props {
   /** Weitere Male gesehen: neue Liste der Daten (ISO). */
   onSetRewatches: (film: Film, rewatches: string[]) => void
   onSetTags: (film: Film, tags: string[]) => void
+  /** Filmreihen, bei denen die Reihenfolge egal ist. */
+  looseSeries: Set<number>
+  onSetSeriesLoose: (collectionId: number, loose: boolean) => void
 }
 
 /** "2026-11-17" → ISO um 12 Uhr Ortszeit (damit das Datum in keiner Zeitzone kippt). */
@@ -121,7 +124,7 @@ function Portrait({ path, name }: { path: string | null; name: string }) {
 export default function FilmDetail({
   film, saved, instant = false, initialScroll = 0, scrollerRef, region, services, cinema, films,
   onClose, onRate, onAddToWatchlist, onAddManyToWatchlist, onMoveToWatchlist, onDelete, onSaveNote, onSetFromNotes,
-  onSaveWithoutRating, onOpenItem, onTogglePriority, onSetRewatches, onSetTags,
+  onSaveWithoutRating, onOpenItem, onTogglePriority, onSetRewatches, onSetTags, looseSeries, onSetSeriesLoose,
 }: Props) {
   const online = useOnline()
   useSwipeBack(scrollerRef, onClose)
@@ -537,6 +540,18 @@ export default function FilmDetail({
                     <button type="button" className="sheet-row" role="menuitemcheckbox" aria-checked={film.fromNotes} onClick={() => onSetFromNotes(film, !film.fromNotes)}>
                       <IconNote /><span>Aus meinen Notizen bewertet</span>
                       <span className={`service-check${film.fromNotes ? " on" : ""}`} aria-hidden="true">{film.fromNotes && <IconCheck />}</span>
+                    </button>
+                  )}
+                  {collection && parts.length > 1 && (
+                    <button
+                      type="button"
+                      className="sheet-row"
+                      role="menuitemcheckbox"
+                      aria-checked={looseSeries.has(collection.id)}
+                      onClick={() => onSetSeriesLoose(collection.id, !looseSeries.has(collection.id))}
+                    >
+                      <IconList /><span>Reihenfolge bei „{collection.name}“ egal</span>
+                      <span className={`service-check${looseSeries.has(collection.id) ? " on" : ""}`} aria-hidden="true">{looseSeries.has(collection.id) && <IconCheck />}</span>
                     </button>
                   )}
                   {watched && (

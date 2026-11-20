@@ -20,6 +20,8 @@ interface Props {
   programme: CpxMovie[] | null
   /** Filmreihen – Filme, deren früherer Teil noch nicht gesehen ist, warten in „Später in der Reihe“. */
   series: SeriesCache
+  /** Filmreihen, bei denen die Reihenfolge egal ist. */
+  loose: Set<number>
   onOpen: (film: Film) => void
   /** Fälligen Teil einer Reihe auf die Watchlist setzen. */
   onAddPart: (film: Film) => void
@@ -35,7 +37,7 @@ function serviceLogos(list: Service[] | undefined) {
   return (list ?? []).filter((s) => s.logoPath).map((s) => ({ src: smallImageUrl(s.logoPath, "w92")!, name: s.name }))
 }
 
-export default function WatchlistView({ films, region, services, streams, cinema, programme, series, onOpen, onAddPart, onFindFilms, onRandom, onOpenServices }: Props) {
+export default function WatchlistView({ films, region, services, streams, cinema, programme, series, loose, onOpen, onAddPart, onFindFilms, onRandom, onOpenServices }: Props) {
   const [streamOnly, setStreamOnly] = useState(false)
   const [tag, setTag] = useState("")
 
@@ -48,7 +50,7 @@ export default function WatchlistView({ films, region, services, streams, cinema
     const waiting: { film: Film; wait: Waiting }[] = []
     for (const f of all) {
       const when = upcomingRelease(f, region, today)
-      const wait = when ? null : waitingFor(f, byId, series)
+      const wait = when ? null : waitingFor(f, byId, series, loose)
       if (when) upcoming.push({ film: f, when })
       else if (wait) waiting.push({ film: f, wait })
       else available.push(f)
@@ -68,7 +70,7 @@ export default function WatchlistView({ films, region, services, streams, cinema
     // Nächster Termin zuerst, offene Termine ans Ende.
     upcoming.sort((a, b) => (a.when.date ?? "9999").localeCompare(b.when.date ?? "9999") || a.film.title.localeCompare(b.film.title, "de"))
     return { available, upcoming, later, total: all.length }
-  }, [films, region, tag, series])
+  }, [films, region, tag, series, loose])
   const tags = useMemo(
     () => [...new Set(films.filter((f) => f.status === "watchlist").flatMap((f) => f.tags ?? []))].sort((a, b) => a.localeCompare(b, "de")),
     [films],

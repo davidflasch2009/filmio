@@ -98,17 +98,18 @@ export interface Waiting {
 const todayStamp = () => new Date().toISOString().slice(0, 10)
 
 /** Reihe eines Films mit ihren erschienenen Teilen – null, wenn keine (oder noch unbekannt). */
-function releasedParts(film: Film, cache: SeriesCache, today: string): { info: SeriesInfo; released: SeriesPart[] } | null {
+function releasedParts(film: Film, cache: SeriesCache, loose: Set<number>, today: string): { info: SeriesInfo; released: SeriesPart[] } | null {
   const colId = cache.films[film.tmdbId]
-  const info = colId == null ? undefined : cache.collections[colId]
+  // Reihenfolge egal (z.B. James Bond): Film zählt wie ein einzelner.
+  const info = colId == null || loose.has(colId) ? undefined : cache.collections[colId]
   if (!info) return null
   const released = info.parts.filter((p) => p.date && p.date <= today)
   return released.some((p) => p.id === film.tmdbId) ? { info, released } : null
 }
 
 /** Muss dieser Film noch warten? Dann: welcher Teil ist zuerst dran. */
-export function waitingFor(film: Film, byId: Map<number, Film>, cache: SeriesCache, today = todayStamp()): Waiting | null {
-  const s = releasedParts(film, cache, today)
+export function waitingFor(film: Film, byId: Map<number, Film>, cache: SeriesCache, loose: Set<number>, today = todayStamp()): Waiting | null {
+  const s = releasedParts(film, cache, loose, today)
   if (!s) return null
   const idx = s.released.findIndex((p) => byId.get(p.id)?.status !== "watched")
   if (idx < 0 || s.released[idx].id === film.tmdbId) return null
@@ -125,17 +126,17 @@ export function partAsFilm(p: SeriesPart): Film {
  * der noch nicht gesehen ist – auch wenn der nicht auf der Watchlist steht (dann als nicht gespeicherter Vorschlag).
  * Steht der fällige Teil auf der Watchlist, kommt er über seinen eigenen Eintrag (wenn er zum Filter passt).
  */
-export function candidates(watchlist: Film[], all: Film[], cache: SeriesCache, today = todayStamp()): Candidate[] {
+export function candidates(watchlist: Film[], all: Film[], cache: SeriesCache, loose: Set<number>, today = todayStamp()): Candidate[] {
   const byId = new Map(all.map((f) => [f.tmdbId, f]))
   const out = new Map<number, Candidate>()
   for (const film of watchlist) {
-    const s = releasedParts(film, cache, today)
+    const s = releasedParts(film, cache, loose, today)
     if (!s) {
       out.set(film.tmdbId, { film, saved: true })
       continue
     }
     const series = (id: number) => ({ name: s.info.name, part: s.released.findIndex((p) => p.id === id) + 1, total: s.released.length })
-    const wait = waitingFor(film, byId, cache, today)
+    const wait = waitingFor(film, byId, cache, loose, today)
     if (!wait) {
       out.set(film.tmdbId, { film, saved: true, series: series(film.tmdbId) })
       continue
