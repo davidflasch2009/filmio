@@ -550,7 +550,7 @@ export default function FilmDetail({
                       aria-checked={looseSeries.has(collection.id)}
                       onClick={() => onSetSeriesLoose(collection.id, !looseSeries.has(collection.id))}
                     >
-                      <IconList /><span>Reihenfolge bei „{collection.name}“ egal</span>
+                      <IconList /><span>„{collection.name}“: nur meine Watchlist beachten</span>
                       <span className={`service-check${looseSeries.has(collection.id) ? " on" : ""}`} aria-hidden="true">{looseSeries.has(collection.id) && <IconCheck />}</span>
                     </button>
                   )}

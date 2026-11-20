@@ -98,22 +98,25 @@ export interface Waiting {
 const todayStamp = () => new Date().toISOString().slice(0, 10)
 
 /** Reihe eines Films mit ihren erschienenen Teilen – null, wenn keine (oder noch unbekannt). */
-function releasedParts(film: Film, cache: SeriesCache, loose: Set<number>, today: string): { info: SeriesInfo; released: SeriesPart[] } | null {
+function releasedParts(film: Film, cache: SeriesCache, today: string): { id: number; info: SeriesInfo; released: SeriesPart[] } | null {
   const colId = cache.films[film.tmdbId]
-  // Reihenfolge egal (z.B. James Bond): Film zählt wie ein einzelner.
-  const info = colId == null || loose.has(colId) ? undefined : cache.collections[colId]
-  if (!info) return null
+  const info = colId == null ? undefined : cache.collections[colId]
+  if (colId == null || !info) return null
   const released = info.parts.filter((p) => p.date && p.date <= today)
-  return released.some((p) => p.id === film.tmdbId) ? { info, released } : null
+  return released.some((p) => p.id === film.tmdbId) ? { id: colId, info, released } : null
 }
 
-/** Muss dieser Film noch warten? Dann: welcher Teil ist zuerst dran. */
+/**
+ * Muss dieser Film noch warten? Dann: welcher Teil ist zuerst dran.
+ * „Nur meine Watchlist beachten“ (loose, z.B. James Bond): Reihenfolge zählt nur zwischen den Teilen auf der Watchlist.
+ */
 export function waitingFor(film: Film, byId: Map<number, Film>, cache: SeriesCache, loose: Set<number>, today = todayStamp()): Waiting | null {
-  const s = releasedParts(film, cache, loose, today)
+  const s = releasedParts(film, cache, today)
   if (!s) return null
-  const idx = s.released.findIndex((p) => byId.get(p.id)?.status !== "watched")
-  if (idx < 0 || s.released[idx].id === film.tmdbId) return null
-  return { next: s.released[idx], part: idx + 1, total: s.released.length, name: s.info.name }
+  const relevant = loose.has(s.id) ? s.released.filter((p) => byId.get(p.id)?.status === "watchlist") : s.released
+  const next = relevant.find((p) => byId.get(p.id)?.status !== "watched")
+  if (!next || next.id === film.tmdbId) return null
+  return { next, part: s.released.indexOf(next) + 1, total: s.released.length, name: s.info.name }
 }
 
 /** Fälliger Teil als (nicht gespeicherter) Film – für Vorschlagskarte und Würfel. */
@@ -130,7 +133,7 @@ export function candidates(watchlist: Film[], all: Film[], cache: SeriesCache, l
   const byId = new Map(all.map((f) => [f.tmdbId, f]))
   const out = new Map<number, Candidate>()
   for (const film of watchlist) {
-    const s = releasedParts(film, cache, loose, today)
+    const s = releasedParts(film, cache, today)
     if (!s) {
       out.set(film.tmdbId, { film, saved: true })
       continue
