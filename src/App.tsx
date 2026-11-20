@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 import type { Film, MyCinema, Service, Store } from "./types"
-import { addFilm, cleanTags, load, newFilm, removeFilm, setCinema, setServices, STORAGE_KEY, updateFilm, updateMany, type ImportResult } from "./lib/storage"
+import { addFilm, cleanTags, load, newFilm, removeFilm, setCinema, setSeriesStart, setServices, STORAGE_KEY, updateFilm, updateMany, type ImportResult } from "./lib/storage"
 import { formatRating } from "./lib/format"
 import { fetchFilmMeta, hasToken, listItemToInfo, loadFilmInfo, type TmdbListItem } from "./lib/tmdb"
 import { releaseNeedsRefresh, upcomingRelease } from "./lib/release"
@@ -178,6 +178,7 @@ function FilmApp({ account, onSignOut }: { account: string; onSignOut: () => voi
   const streams = useStreams(store.films, services, region, online)
   // Filmreihen der Watchlist (für den Würfel: immer der nächste fällige Teil).
   const series = useSeries(store.films, online)
+  const seriesStart = useMemo(() => new Map(Object.entries(store.seriesStart?.starts ?? {}).map(([k, v]) => [Number(k), v])), [store.seriesStart])
   const [servicesOpen, setServicesOpen] = useState(false)
   const [listsOpen, setListsOpen] = useState(false)
   // Mein Kino und dessen Programm.
@@ -421,6 +422,7 @@ function FilmApp({ account, onSignOut }: { account: string; onSignOut: () => voi
             cinema={cinema}
             programme={programme}
             series={series}
+            seriesStart={seriesStart}
             onOpen={openSaved}
             onAddPart={(film) => void addPartToWatchlist(film)}
             onFindFilms={() => changeTab("search")}
@@ -501,6 +503,8 @@ function FilmApp({ account, onSignOut }: { account: string; onSignOut: () => voi
           onTogglePriority={togglePriority}
           onSetRewatches={setRewatches}
           onSetTags={setTags}
+          seriesStart={seriesStart}
+          onSetSeriesStart={(id, tmdbId) => persist(() => setSeriesStart(id, tmdbId))}
         />
       )}
 
@@ -520,6 +524,7 @@ function FilmApp({ account, onSignOut }: { account: string; onSignOut: () => voi
           films={store.films.filter((f) => f.status === "watchlist" && !upcomingRelease(f, region))}
           allFilms={store.films}
           series={series}
+          seriesStart={seriesStart}
           streams={streams}
           hasServices={services.length > 0}
           onClose={() => setPicking(false)}

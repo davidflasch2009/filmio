@@ -54,6 +54,10 @@ interface Props {
   /** Weitere Male gesehen: neue Liste der Daten (ISO). */
   onSetRewatches: (film: Film, rewatches: string[]) => void
   onSetTags: (film: Film, tags: string[]) => void
+  /** Filmreihen, die erst ab einem bestimmten Film zählen (Collection-ID → tmdbId). */
+  seriesStart: Map<number, number>
+  /** Reihe ab diesem Film zählen (null = ganze Reihe). */
+  onSetSeriesStart: (collectionId: number, tmdbId: number | null) => void
 }
 
 /** "2026-11-17" → ISO um 12 Uhr Ortszeit (damit das Datum in keiner Zeitzone kippt). */
@@ -121,7 +125,7 @@ function Portrait({ path, name }: { path: string | null; name: string }) {
 export default function FilmDetail({
   film, saved, instant = false, initialScroll = 0, scrollerRef, region, services, cinema, films,
   onClose, onRate, onAddToWatchlist, onAddManyToWatchlist, onMoveToWatchlist, onDelete, onSaveNote, onSetFromNotes,
-  onSaveWithoutRating, onOpenItem, onTogglePriority, onSetRewatches, onSetTags,
+  onSaveWithoutRating, onOpenItem, onTogglePriority, onSetRewatches, onSetTags, seriesStart, onSetSeriesStart,
 }: Props) {
   const online = useOnline()
   useSwipeBack(scrollerRef, onClose)
@@ -205,6 +209,7 @@ export default function FilmDetail({
   const savedById = new Map(films.map((f) => [f.tmdbId, f]))
   const parts = collection?.parts ?? []
   const seenParts = parts.filter((p) => savedById.get(p.id)?.status === "watched").length
+  const startsHere = collection !== null && seriesStart.get(collection.id) === film.tmdbId
   const missingParts = parts.filter((p) => !savedById.has(p.id) && p.release_date)
 
   async function addMissingParts() {
@@ -537,6 +542,18 @@ export default function FilmDetail({
                     <button type="button" className="sheet-row" role="menuitemcheckbox" aria-checked={film.fromNotes} onClick={() => onSetFromNotes(film, !film.fromNotes)}>
                       <IconNote /><span>Aus meinen Notizen bewertet</span>
                       <span className={`service-check${film.fromNotes ? " on" : ""}`} aria-hidden="true">{film.fromNotes && <IconCheck />}</span>
+                    </button>
+                  )}
+                  {collection && parts.length > 1 && (
+                    <button
+                      type="button"
+                      className="sheet-row"
+                      role="menuitemcheckbox"
+                      aria-checked={startsHere}
+                      onClick={() => onSetSeriesStart(collection.id, startsHere ? null : film.tmdbId)}
+                    >
+                      <IconList /><span>„{collection.name}“ erst ab diesem Film zählen</span>
+                      <span className={`service-check${startsHere ? " on" : ""}`} aria-hidden="true">{startsHere && <IconCheck />}</span>
                     </button>
                   )}
                   {watched && (

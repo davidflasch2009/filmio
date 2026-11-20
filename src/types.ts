@@ -54,6 +54,8 @@ export interface Store {
   services?: { list: Service[]; updatedAt: string }
   /** Mein Kino (Cineplexx Österreich); null = keins gewählt. */
   cinema?: { value: MyCinema | null; updatedAt: string }
+  /** Filmreihen, die erst ab einem bestimmten Film zählen (TMDB-Collection-ID → tmdbId), z.B. James Bond ab Casino Royale. */
+  seriesStart?: { starts: Record<string, number>; updatedAt: string }
 }
 
 export interface MyCinema {

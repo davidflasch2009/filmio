@@ -53,6 +53,9 @@ export function mergeStores(local: Store, remote: Store): Store {
   const cinema = !local.cinema ? remote.cinema : !remote.cinema ? local.cinema
     : remote.cinema.updatedAt > local.cinema.updatedAt ? remote.cinema : local.cinema
   if (cinema) merged.cinema = cinema
+  const start = !local.seriesStart ? remote.seriesStart : !remote.seriesStart ? local.seriesStart
+    : remote.seriesStart.updatedAt > local.seriesStart.updatedAt ? remote.seriesStart : local.seriesStart
+  if (start) merged.seriesStart = start
   return merged
 }
 
@@ -60,7 +63,7 @@ export function mergeStores(local: Store, remote: Store): Store {
 function fingerprint(store: Store): string {
   const films = [...store.films].sort((a, b) => a.tmdbId - b.tmdbId)
   const deleted = Object.entries(store.deleted ?? {}).sort(([a], [b]) => Number(a) - Number(b))
-  return JSON.stringify([films, deleted, store.services ?? null, store.cinema ?? null])
+  return JSON.stringify([films, deleted, store.services ?? null, store.cinema ?? null, store.seriesStart ?? null])
 }
 
 // ---------------------------------------------------------------------------
