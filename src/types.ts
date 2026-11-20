@@ -54,8 +54,8 @@ export interface Store {
   services?: { list: Service[]; updatedAt: string }
   /** Mein Kino (Cineplexx Österreich); null = keins gewählt. */
   cinema?: { value: MyCinema | null; updatedAt: string }
-  /** Filmreihen (TMDB-Collection-IDs), bei denen die Reihenfolge egal ist – z.B. James Bond. */
-  looseSeries?: { ids: number[]; updatedAt: string }
+  /** Filmreihen, die erst ab einem bestimmten Film zählen (TMDB-Collection-ID → tmdbId), z.B. James Bond ab Casino Royale. */
+  seriesStart?: { starts: Record<string, number>; updatedAt: string }
 }
 
 export interface MyCinema {

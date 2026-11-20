@@ -108,12 +108,13 @@ function releasedParts(film: Film, cache: SeriesCache, today: string): { id: num
 
 /**
  * Muss dieser Film noch warten? Dann: welcher Teil ist zuerst dran.
- * „Nur meine Watchlist beachten“ (loose, z.B. James Bond): Reihenfolge zählt nur zwischen den Teilen auf der Watchlist.
+ * Startet die Reihe erst bei einem bestimmten Film (z.B. James Bond ab Casino Royale), zählen nur er und die Teile danach.
  */
-export function waitingFor(film: Film, byId: Map<number, Film>, cache: SeriesCache, loose: Set<number>, today = todayStamp()): Waiting | null {
+export function waitingFor(film: Film, byId: Map<number, Film>, cache: SeriesCache, starts: Map<number, number>, today = todayStamp()): Waiting | null {
   const s = releasedParts(film, cache, today)
   if (!s) return null
-  const relevant = loose.has(s.id) ? s.released.filter((p) => byId.get(p.id)?.status === "watchlist") : s.released
+  const startAt = s.info.parts.findIndex((p) => p.id === starts.get(s.id))
+  const relevant = startAt < 0 ? s.released : s.released.filter((p) => s.info.parts.indexOf(p) >= startAt)
   const next = relevant.find((p) => byId.get(p.id)?.status !== "watched")
   if (!next || next.id === film.tmdbId) return null
   return { next, part: s.released.indexOf(next) + 1, total: s.released.length, name: s.info.name }
@@ -129,7 +130,7 @@ export function partAsFilm(p: SeriesPart): Film {
  * der noch nicht gesehen ist – auch wenn der nicht auf der Watchlist steht (dann als nicht gespeicherter Vorschlag).
  * Steht der fällige Teil auf der Watchlist, kommt er über seinen eigenen Eintrag (wenn er zum Filter passt).
  */
-export function candidates(watchlist: Film[], all: Film[], cache: SeriesCache, loose: Set<number>, today = todayStamp()): Candidate[] {
+export function candidates(watchlist: Film[], all: Film[], cache: SeriesCache, starts: Map<number, number>, today = todayStamp()): Candidate[] {
   const byId = new Map(all.map((f) => [f.tmdbId, f]))
   const out = new Map<number, Candidate>()
   for (const film of watchlist) {
@@ -139,7 +140,7 @@ export function candidates(watchlist: Film[], all: Film[], cache: SeriesCache, l
       continue
     }
     const series = (id: number) => ({ name: s.info.name, part: s.released.findIndex((p) => p.id === id) + 1, total: s.released.length })
-    const wait = waitingFor(film, byId, cache, loose, today)
+    const wait = waitingFor(film, byId, cache, starts, today)
     if (!wait) {
       out.set(film.tmdbId, { film, saved: true, series: series(film.tmdbId) })
       continue

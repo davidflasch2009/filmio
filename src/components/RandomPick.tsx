@@ -14,8 +14,8 @@ interface Props {
   /** Alle gespeicherten Filme – um zu sehen, welche Teile einer Reihe schon gesehen sind. */
   allFilms: Film[]
   series: SeriesCache
-  /** Filmreihen, bei denen die Reihenfolge egal ist. */
-  loose: Set<number>
+  /** Filmreihen, die erst ab einem bestimmten Film zählen (Collection-ID → tmdbId). */
+  seriesStart: Map<number, number>
   /** tmdbId → meine Dienste, bei denen der Film läuft (leer, wenn keine Dienste gewählt). */
   streams: Map<number, Service[]>
   hasServices: boolean
@@ -86,11 +86,11 @@ function fillSlots(pool: Candidate[], keep: Map<number, Film>): Film[] {
 }
 
 /** Zufälliger Vorschlag aus der Watchlist – als Karussell, das ausläuft und den Film nach vorne holt. */
-export default function RandomPick({ films, allFilms, series, loose, streams, hasServices, onOpen, onAddToWatchlist, onClose }: Props) {
+export default function RandomPick({ films, allFilms, series, seriesStart, streams, hasServices, onOpen, onAddToWatchlist, onClose }: Props) {
   const [reduced] = useState(prefersReducedMotion)
   const [filter, setFilter] = useState<Filter>({ genre: "", short: false, mine: false })
   const { genre, short, mine } = filter
-  const all = useMemo(() => candidates(films, allFilms, series, loose), [films, allFilms, series, loose])
+  const all = useMemo(() => candidates(films, allFilms, series, seriesStart), [films, allFilms, series, seriesStart])
   const pool = filterPool(all, filter, streams)
   const [spin, setSpin] = useState<Spin | null>(null)
   const [adding, setAdding] = useState(false)
