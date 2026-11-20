@@ -208,7 +208,7 @@ export default function RandomPick({ films, allFilms, series, streams, hasServic
             <div className={`pick-info${landed ? " on" : ""}`} aria-live="polite">
               {landed && (
                 <>
-                  {target.series && (
+                  {target.series && target.series.total > 1 && (
                     <p className="pick-series">Teil {target.series.part} von {target.series.total} · {target.series.name}</p>
                   )}
                   <h2 className="pick-title">{target.film.title}</h2>
