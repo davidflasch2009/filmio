@@ -21,6 +21,8 @@ interface Props {
   onSaveWithoutRating: () => void
   /** „i“ mit Erklärung zu jeder Frage zeigen (Mehr → Darstellung). */
   showHelp?: boolean
+  /** Beschriftung für „ohne Bewertung speichern“ (Nachbewerten: „Weiß ich nicht mehr“). */
+  skipLabel?: string
 }
 
 /** Wie eine Skala: Nein links, Ja rechts unter dem Daumen. */
@@ -117,7 +119,7 @@ function StarReveal({ rating, onDone }: { rating: number; onDone: () => void }) 
 }
 
 /** Fragebogen: eine Frage pro Screen, Auto-Weiter, danach die Sterne-Enthüllung. */
-export default function RatingFlow({ film, onCancel, onSave, onSaveWithoutRating, showHelp = true }: Props) {
+export default function RatingFlow({ film, onCancel, onSave, onSaveWithoutRating, showHelp = true, skipLabel = "Früher gesehen – ohne Bewertung" }: Props) {
   const total = QUESTIONS.length
   const [step, setStep] = useState(0)
   const [answers, setAnswers] = useState<(Answer | undefined)[]>(() => Array(total).fill(undefined))
@@ -209,7 +211,7 @@ export default function RatingFlow({ film, onCancel, onSave, onSaveWithoutRating
               {answers[step] !== undefined && step < total - 1 ? (
                 <button type="button" className="text-btn" onClick={() => setStep(step + 1)}>Weiter</button>
               ) : step === 0 && (
-                <button type="button" className="text-btn skip-rating" onClick={onSaveWithoutRating}>Früher gesehen – ohne Bewertung</button>
+                <button type="button" className="text-btn skip-rating" onClick={onSaveWithoutRating}>{skipLabel}</button>
               )}
             </div>
           </section>

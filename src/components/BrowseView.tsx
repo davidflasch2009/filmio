@@ -29,13 +29,13 @@ interface RowDef {
 
 /** Ein Film, der dir gefallen hat – als Ausgangspunkt für Empfehlungen (pro Sitzung fest). */
 function pickSeed(films: Film[]): Film | null {
-  const liked = films.filter((f) => f.status === "watched" && (f.rating ?? 0) >= 4)
+  const liked = films.filter((f) => f.status === "watched" && !f.fromNotes && (f.rating ?? 0) >= 4)
   return liked.length ? liked[Math.floor(Math.random() * liked.length)] : null
 }
 
 /** Basis für „Für dich“: bis zu 5 deiner besten Filme (4,5+ Sterne; gibt es davon weniger als 3, ab 4 Sternen). */
 function pickFavourites(films: Film[]): Film[] {
-  const watched = films.filter((f) => f.status === "watched")
+  const watched = films.filter((f) => f.status === "watched" && !f.fromNotes)
   let best = watched.filter((f) => (f.rating ?? 0) >= 4.5)
   if (best.length < 3) best = watched.filter((f) => (f.rating ?? 0) >= 4)
   return [...best].sort(() => Math.random() - 0.5).slice(0, 5)
@@ -74,7 +74,7 @@ async function loadForYou(seeds: Film[], films: Film[]): Promise<TmdbListItem[]>
 function favouriteGenres(films: Film[]): string[] {
   const counts = new Map<string, number>()
   for (const f of films) {
-    if (f.status !== "watched" || (f.rating ?? 0) < 3.5) continue
+    if (f.status !== "watched" || f.fromNotes || (f.rating ?? 0) < 3.5) continue
     for (const g of f.genres) if (g in GENRE_IDS) counts.set(g, (counts.get(g) ?? 0) + 1)
   }
   const top = [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 2).map(([g]) => g)

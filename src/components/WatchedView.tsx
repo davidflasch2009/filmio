@@ -23,6 +23,8 @@ const NOTES_MARKER = { icon: <IconNote />, label: "Bewertung aus meinen Notizen"
 interface Props {
   films: Film[]
   onOpen: (film: Film) => void
+  /** Filme mit Bewertung aus den Notizen der Reihe nach per Fragebogen neu bewerten. */
+  onRerate: () => void
   onFindFilms: () => void
 }
 
@@ -33,7 +35,7 @@ function lastSeen(f: Film): number {
   return Math.max(Date.parse(f.watchedAt ?? "") || 0, ...(f.rewatches ?? []).map((r) => Date.parse(r) || 0))
 }
 
-export default function WatchedView({ films, onOpen, onFindFilms }: Props) {
+export default function WatchedView({ films, onOpen, onRerate, onFindFilms }: Props) {
   const [sort, setSort] = useState<SortKey>("rating-desc")
   const [genre, setGenre] = useState("")
   const [minRating, setMinRating] = useState(0)
@@ -68,10 +70,11 @@ export default function WatchedView({ films, onOpen, onFindFilms }: Props) {
     const sorted = [...list]
     switch (sort) {
       case "rating-desc":
-        sorted.sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0) || byTitle(a, b))
+        // Gleiche Sterne: echte Bewertungen vor denen aus den Notizen.
+        sorted.sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0) || Number(a.fromNotes) - Number(b.fromNotes) || byTitle(a, b))
         break
       case "rating-asc":
-        sorted.sort((a, b) => (a.rating ?? 0) - (b.rating ?? 0) || byTitle(a, b))
+        sorted.sort((a, b) => (a.rating ?? 0) - (b.rating ?? 0) || Number(a.fromNotes) - Number(b.fromNotes) || byTitle(a, b))
         break
       case "added-desc":
         sorted.sort((a, b) => time(b.addedAt) - time(a.addedAt) || byTitle(a, b))
@@ -110,6 +113,11 @@ export default function WatchedView({ films, onOpen, onFindFilms }: Props) {
           <>
             <SearchField value={query} onChange={setQuery} placeholder="In „Gesehen“ suchen" ariaLabel="In gesehenen Filmen suchen" />
             <div className="chips">
+              {notesCount > 0 && (
+                <button type="button" className="chip chip-rerate" onClick={onRerate}>
+                  <IconNote /><span className="chip-text">Nachbewerten · {notesCount}</span>
+                </button>
+              )}
               <FilterChip id="watched-sort" label="Sortieren" options={SORTS} value={sort} onChange={setSort} active={sort !== "rating-desc"} />
               <FilterChip
                 id="watched-genre"
@@ -171,6 +179,7 @@ export default function WatchedView({ films, onOpen, onFindFilms }: Props) {
                   year={f.year}
                   posterPath={f.posterPath}
                   rating={f.rating}
+                  ratingMuted={f.fromNotes}
                   marker={f.fromNotes ? NOTES_MARKER : undefined}
                   onOpen={() => onOpen(f)}
                 />
