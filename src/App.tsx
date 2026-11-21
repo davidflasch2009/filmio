@@ -22,6 +22,7 @@ import EarlierView from "./components/EarlierView"
 import MoreView from "./components/MoreView"
 import FilmDetail from "./components/FilmDetail"
 import RatingFlow, { type RatingResult } from "./components/RatingFlow"
+import RerateStep from "./components/RerateStep"
 import RandomPick from "./components/RandomPick"
 import StatsView from "./components/StatsView"
 import LoginScreen from "./components/LoginScreen"
@@ -100,6 +101,8 @@ function FilmApp({ account, onSignOut }: { account: string; onSignOut: () => voi
   const [toast, setToast] = useState<Toast | null>(null)
   /** Zufallsvorschlag aus der Watchlist geöffnet. */
   const [picking, setPicking] = useState(false)
+  /** Nachbewerten: aktueller Film; last = gerade bewertet (Vergleich wird gezeigt). */
+  const [rerate, setRerate] = useState<{ id: number; last: { film: Film; before: number; after: number | null } | null } | null>(null)
   const online = useOnline()
   const scrollPositions = useRef<Record<Tab, number>>({ watched: 0, watchlist: 0, earlier: 0, search: 0, more: 0 })
 
@@ -193,7 +196,7 @@ function FilmApp({ account, onSignOut }: { account: string; onSignOut: () => voi
     return () => clearTimeout(t)
   }, [toast])
 
-  const overlayOpen = details.length > 0 || rating !== null || picking || statsOpen || servicesOpen || listsOpen || cinemaOpen || person !== null
+  const overlayOpen = details.length > 0 || rating !== null || rerate !== null || picking || statsOpen || servicesOpen || listsOpen || cinemaOpen || person !== null
   useEffect(() => {
     document.body.classList.toggle("no-scroll", overlayOpen)
   }, [overlayOpen])
@@ -244,6 +247,29 @@ function FilmApp({ account, onSignOut }: { account: string; onSignOut: () => voi
   async function addPartToWatchlist(film: Film) {
     const info = await loadFilmInfo(film.tmdbId).catch(() => null)
     addToWatchlist(info ? newFilm(info) : film)
+  }
+
+  /**
+   * Nachbewerten: Filme mit Bewertung aus den Notizen der Reihe nach per Fragebogen bewerten
+   * (zuletzt gesehen zuerst). Nach jedem Film ein Vergleich Notiz → jetzt.
+   */
+  function rerateQueue(films: Film[]): number[] {
+    return films
+      .filter((f) => f.status === "watched" && f.fromNotes && f.rating !== null)
+      .sort((a, b) => (Date.parse(b.watchedAt ?? "") || 0) - (Date.parse(a.watchedAt ?? "") || 0) || a.title.localeCompare(b.title, "de"))
+      .map((f) => f.tmdbId)
+  }
+  function startRerate() {
+    const queue = rerateQueue(store.films)
+    if (queue.length) setRerate({ id: queue[0], last: null })
+  }
+  function nextRerate() {
+    const queue = rerateQueue(load().films)
+    setRerate(queue.length ? { id: queue[0], last: null } : null)
+  }
+  function finishRerate(film: Film, after: number | null, save: () => boolean) {
+    const before = film.rating ?? 0
+    if (save()) setRerate({ id: film.tmdbId, last: { film, before, after } })
   }
 
   function saveRating(film: Film, result: RatingResult) {
@@ -411,7 +437,7 @@ function FilmApp({ account, onSignOut }: { account: string; onSignOut: () => voi
     <div className="app" data-grid={settings.gridSize}>
       <main className="main">
         <div hidden={tab !== "watched"}>
-          <WatchedView films={store.films} onOpen={openSaved} onFindFilms={() => changeTab("search")} />
+          <WatchedView films={store.films} onOpen={openSaved} onRerate={startRerate} onFindFilms={() => changeTab("search")} />
         </div>
         <div hidden={tab !== "watchlist"}>
           <WatchlistView
@@ -516,6 +542,31 @@ function FilmApp({ account, onSignOut }: { account: string; onSignOut: () => voi
           onSave={(result) => saveRating(rating, result)}
           onSaveWithoutRating={() => saveWithoutRating(rating)}
           showHelp={settings.questionHelp}
+        />
+      )}
+
+      {rerate && !rerate.last && findSaved(rerate.id) && (() => {
+        const film = findSaved(rerate.id)!
+        return (
+          <RatingFlow
+            key={`rerate-${film.tmdbId}`}
+            film={{ ...film, answers: null }}
+            onCancel={() => setRerate(null)}
+            onSave={(result) => finishRerate(film, result.rating, () => persist(() => updateFilm(film.tmdbId, { rating: result.rating, answers: result.answers, fromNotes: false })))}
+            onSaveWithoutRating={() => finishRerate(film, null, () => persist(() => updateFilm(film.tmdbId, { rating: null, answers: null, fromNotes: false })))}
+            showHelp={settings.questionHelp}
+            skipLabel="Weiß ich nicht mehr"
+          />
+        )
+      })()}
+      {rerate?.last && (
+        <RerateStep
+          film={rerate.last.film}
+          before={rerate.last.before}
+          after={rerate.last.after}
+          left={rerateQueue(store.films).length}
+          onNext={nextRerate}
+          onDone={() => setRerate(null)}
         />
       )}
 

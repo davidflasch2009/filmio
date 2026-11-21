@@ -290,8 +290,8 @@ export default function FilmDetail({
       {metaLine && <p className="detail-meta">{metaLine}</p>}
       {ratingStars && (
         <p className="d-rating">
-          <StarRating value={film.rating!} size={20} />
-          <span className="d-rating-num">{formatRating(film.rating!)}</span>
+          <StarRating value={film.rating!} size={20} muted={film.fromNotes} />
+          <span className={`d-rating-num${film.fromNotes ? " muted" : ""}`}>{formatRating(film.rating!)}</span>
           {film.fromNotes && <span className="d-rating-note"><IconNote />aus Notizen</span>}
         </p>
       )}

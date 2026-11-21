@@ -53,6 +53,8 @@ interface Props {
   year: number | null
   posterPath: string | null
   rating?: number | null
+  /** Bewertung aus den Notizen: Sterne grau statt gold. */
+  ratingMuted?: boolean
   badge?: ReactNode
   /** Kleines Symbol in der Poster-Ecke (z.B. „aus meinen Notizen“); label für Screenreader/Tooltip. */
   marker?: { icon: ReactNode; label: string }
@@ -67,7 +69,7 @@ interface Props {
 }
 
 /** Karte für Listen und Suchtreffer: Poster, Titel, Sterne + Jahr, optional Hinweis und Buttons. */
-export default function FilmCard({ title, year, posterPath, rating, badge, marker, logos, onOpen, look, actionLabel, children }: Props) {
+export default function FilmCard({ title, year, posterPath, rating, ratingMuted, badge, marker, logos, onOpen, look, actionLabel, children }: Props) {
   const body = (
     <>
       <span className="poster-wrap">
@@ -84,7 +86,7 @@ export default function FilmCard({ title, year, posterPath, rating, badge, marke
         <span className="card-title">{title}</span>
         {(rating != null || year !== null) && (
           <span className="card-meta">
-            {rating != null && <StarRating value={rating} size={11} />}
+            {rating != null && <StarRating value={rating} size={11} muted={ratingMuted} />}
             {year !== null && <span className="card-year">{year}</span>}
           </span>
         )}

@@ -11,6 +11,8 @@ interface Props {
   /** Für die Enthüllung: Zugriff auf die gefüllte Reihe, startet dann leer. */
   fillRef?: Ref<HTMLSpanElement>
   startEmpty?: boolean
+  /** Grau statt gold – Bewertung aus den eigenen Notizen, nicht per Fragebogen. */
+  muted?: boolean
 }
 
 function Row() {
@@ -23,10 +25,11 @@ function Row() {
 }
 
 /** Zeigt 0,5–5 Sterne inkl. halber Sterne an (nur Anzeige, keine Eingabe). */
-export default function StarRating({ value, size = 14, className, fillRef, startEmpty = false }: Props) {
-  const label = `${formatRating(value)} von 5 Sternen`
+export default function StarRating({ value, size = 14, className, fillRef, startEmpty = false, muted = false }: Props) {
+  const label = `${formatRating(value)} von 5 Sternen${muted ? " (aus Notizen)" : ""}`
+  const cls = ["stars", muted ? "stars-muted" : "", className ?? ""].filter(Boolean).join(" ")
   return (
-    <span className={className ? `stars ${className}` : "stars"} style={{ fontSize: size }} role="img" aria-label={label} title={label}>
+    <span className={cls} style={{ fontSize: size }} role="img" aria-label={label} title={label}>
       <span className="st-base"><Row /></span>
       <span className="st-fill" ref={fillRef} style={{ width: `${startEmpty ? 0 : starFillPercent(value)}%` }}><Row /></span>
     </span>

@@ -75,7 +75,8 @@ export default function StatsView({ films, onClose, onOpen }: Props) {
 
   const stats = useMemo(() => {
     const watched = films.filter((f) => f.status === "watched")
-    const rated = watched.filter((f) => f.rating !== null)
+    // Bewertungen aus den Notizen zählen hier nicht (anderer Maßstab als der Fragebogen).
+    const rated = watched.filter((f) => f.rating !== null && !f.fromNotes)
     const watchlist = films.filter((f) => f.status === "watchlist")
     const average = rated.length ? rated.reduce((s, f) => s + (f.rating ?? 0), 0) / rated.length : null
 
@@ -95,7 +96,7 @@ export default function StatsView({ films, onClose, onOpen }: Props) {
       for (const g of f.genres) {
         const e = byGenre.get(g) ?? { n: 0, sum: 0, ratedN: 0 }
         e.n++
-        if (f.rating !== null) { e.sum += f.rating; e.ratedN++ }
+        if (f.rating !== null && !f.fromNotes) { e.sum += f.rating; e.ratedN++ }
         byGenre.set(g, e)
       }
     }

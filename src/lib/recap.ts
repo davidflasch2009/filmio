@@ -67,7 +67,8 @@ export function buildRecap(films: Film[], year: number): Recap | null {
     .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "de"))
     .map(([name, count]) => ({ name, count }))
 
-  const best = distinct.filter((f) => f.rating !== null)
+  // Nur per Fragebogen bewertete Filme (Notiz-Bewertungen haben einen anderen Maßstab).
+  const best = distinct.filter((f) => f.rating !== null && !f.fromNotes)
     .sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0) || a.title.localeCompare(b.title, "de"))
   const average = best.length ? best.reduce((s, f) => s + (f.rating ?? 0), 0) / best.length : null
 
