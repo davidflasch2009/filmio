@@ -13,8 +13,12 @@ export function useViewportFix(): void {
     let frame = 0
     const update = () => {
       frame = 0
-      const top = Math.round(vv.offsetTop)
-      const bottom = Math.round(vv.offsetTop + vv.height - window.innerHeight)
+      // Beim Federn am oberen/unteren Rand (Überziehen) meldet iOS ebenfalls einen Versatz – dann nichts verschieben,
+      // die Leiste soll wie gewohnt stehen bleiben.
+      const max = document.documentElement.scrollHeight - window.innerHeight
+      const bouncing = window.scrollY < 0 || window.scrollY > max
+      const top = bouncing ? 0 : Math.max(0, Math.round(vv.offsetTop))
+      const bottom = bouncing ? 0 : Math.max(0, Math.round(vv.offsetTop + vv.height - window.innerHeight))
       root.setProperty("--vv-top", `${top}px`)
       root.setProperty("--vv-bottom", `${bottom}px`)
     }
