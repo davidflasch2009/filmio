@@ -13,6 +13,7 @@ import PersonView from "./components/PersonView"
 import type { TmdbPerson } from "./lib/tmdb"
 import { useCinemaProgramme } from "./hooks/useCinemaProgramme"
 import { useOnline } from "./hooks/useOnline"
+import { useViewportFix } from "./hooks/useViewportFix"
 import { loadSettings, saveSettings, type Settings } from "./lib/settings"
 import TabBar, { type Tab } from "./components/TabBar"
 import SearchView from "./components/SearchView"
@@ -75,6 +76,7 @@ interface Toast {
 /** Ohne Anmeldung keine App: erst der Anmelde-Bildschirm, danach filmio. */
 export default function App() {
   const [session, setSession] = useState<Session | null>(loadSession)
+  useViewportFix()
 
   // Abgelaufene Anmeldung (oder Abmelden auf diesem Gerät) → zurück zum Anmelde-Bildschirm.
   useEffect(() => onSessionChange(setSession), [])
