@@ -42,6 +42,8 @@ html, body, * { scrollbar-width: none; -ms-overflow-style: none; }
 
 html, body { margin: 0; background: var(--bg); color: var(--fg); }
 body { min-height: 100vh; min-height: 100dvh; overscroll-behavior-y: none; -webkit-tap-highlight-color: transparent; }
+/* Kein Doppeltipp-Zoom (in der installierten App verrutschen sonst Tab-Leiste und Statusleisten-Abdeckung) */
+html { touch-action: manipulation; }
 body.no-scroll { overflow: hidden; }
 
 button, input, select, textarea { font: inherit; color: inherit; }
@@ -62,6 +64,8 @@ img { display: block; max-width: 100%; }
 .app::before {
   content: ""; position: fixed; top: 0; left: 0; right: 0; z-index: 50;
   height: env(safe-area-inset-top); background: var(--bg); pointer-events: none;
+  /* Am sichtbaren Bereich ausrichten (siehe useViewportFix) */
+  transform: translateY(var(--vv-top, 0px));
 }
 .main {
   padding-top: env(safe-area-inset-top);
@@ -236,7 +240,7 @@ div.card-main { cursor: default; }
 /* ---------- Tab-Leiste ---------- */
 
 .tabbar {
-  position: fixed; z-index: 10;
+  position: fixed; z-index: 10; transform: translateY(var(--vv-bottom, 0px));
   left: max(14px, env(safe-area-inset-left)); right: max(14px, env(safe-area-inset-right));
   bottom: calc(var(--tabbar-gap) + env(safe-area-inset-bottom));
   max-width: 520px; margin: 0 auto; height: var(--tabbar-h);
